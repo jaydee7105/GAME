@@ -373,9 +373,9 @@ def music():
         w.writeframes(data.tobytes())
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", wav_path, "-c:a", "libvorbis", "-q:a", "4",
                     os.path.join(OUT, "music.ogg")], check=True)
-    # AAC fallback for browsers without Ogg Vorbis (Safari).
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", wav_path, "-c:a", "aac", "-b:a", "128k",
-                    os.path.join(OUT, "music.m4a")], check=True)
+    # MP3 fallback for browsers without Ogg Vorbis (Safari).
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", wav_path, "-c:a", "libmp3lame", "-b:a", "128k",
+                    os.path.join(OUT, "music.mp3")], check=True)
 
 
 def main():

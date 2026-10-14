@@ -62,7 +62,7 @@ class AudioEngine {
       }));
       try {
         const canOgg = new Audio().canPlayType('audio/ogg; codecs="vorbis"') !== "";
-        this.musicBuffer = await fetchBuffer(`assets/audio/music.${canOgg ? "ogg" : "m4a"}`);
+        this.musicBuffer = await fetchBuffer(`assets/audio/music.${canOgg ? "ogg" : "mp3"}`);
         this.applySettings();
       } catch (e) {
         console.warn("music failed", e);
