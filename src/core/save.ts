@@ -7,7 +7,7 @@ import { hashString } from "./rng";
 
 const KEY = "planet-drop/save/v1";
 
-export type SettingKey = "music" | "sfx" | "haptics" | "faces" | "guide";
+export type SettingKey = "music" | "sfx" | "haptics" | "faces" | "guide" | "reminders";
 
 export interface Stats {
   games: number;
@@ -15,6 +15,22 @@ export interface Stats {
   supernovas: number;
   drops: number;
   seconds: number;
+  blackHoles: number;
+  shakes: number;
+  revives: number;
+  bestChain: number;
+  levelsWon: number;
+}
+
+/** Ad pacing state (see monetization/config.ts). */
+export interface AdState {
+  /** Finished runs and levels, for the new-player grace period and pacing. */
+  finished: number;
+  /** `finished` value when the last interstitial was shown. */
+  lastAt: number;
+  /** Epoch ms of the last interstitial. */
+  lastTime: number;
+  shown: number;
 }
 
 export interface SaveData {
@@ -28,6 +44,13 @@ export interface SaveData {
   stats: Stats;
   tutorialDone: boolean;
   snapshot: Snapshot | null;
+  /** Adventure: highest unlocked level (1-based) and stars per level. */
+  adventure: { unlocked: number; stars: Record<string, number> };
+  achievements: Record<string, number>;
+  theme: string;
+  ads: AdState;
+  review: { asked: number; last: number };
+  reminderAsked: boolean;
 }
 
 export interface PlanetSnap { t: number; x: number; y: number; r: number; vx: number; vy: number; w: number }
@@ -48,22 +71,32 @@ export interface Snapshot {
   elapsed: number;
   rng: number;
   planets: PlanetSnap[];
+  level?: number;
+  revived?: boolean;
+  dropsLeft?: number;
+  goals?: number[];
 }
 
-export type Mode = "classic" | "daily";
+export type Mode = "classic" | "daily" | "adventure";
 
 function defaults(): SaveData {
   return {
-    settings: { music: true, sfx: true, haptics: true, faces: true, guide: true },
+    settings: { music: true, sfx: true, haptics: true, faces: true, guide: true, reminders: false },
     best: 0,
     dailyBest: {},
     dailyStreak: 0,
     dailyLast: "",
     discovered: new Array(COUNT).fill(false),
     created: new Array(COUNT).fill(0),
-    stats: { games: 0, merges: 0, supernovas: 0, drops: 0, seconds: 0 },
+    stats: { games: 0, merges: 0, supernovas: 0, drops: 0, seconds: 0, blackHoles: 0, shakes: 0, revives: 0, bestChain: 0, levelsWon: 0 },
     tutorialDone: false,
     snapshot: null,
+    adventure: { unlocked: 1, stars: {} },
+    achievements: {},
+    theme: "classic",
+    ads: { finished: 0, lastAt: 0, lastTime: 0, shown: 0 },
+    review: { asked: 0, last: 0 },
+    reminderAsked: false,
   };
 }
 
@@ -98,6 +131,10 @@ class SaveStore extends Emitter<{ settings: [] }> {
         ...parsed,
         settings: { ...d.settings, ...(parsed.settings ?? {}) },
         stats: { ...d.stats, ...(parsed.stats ?? {}) },
+        adventure: { ...d.adventure, ...(parsed.adventure ?? {}), stars: { ...(parsed.adventure?.stars ?? {}) } },
+        achievements: { ...(parsed.achievements ?? {}) },
+        ads: { ...d.ads, ...(parsed.ads ?? {}) },
+        review: { ...d.review, ...(parsed.review ?? {}) },
         discovered: d.discovered.map((_, i) => Boolean(parsed.discovered?.[i])),
         created: d.created.map((_, i) => Number(parsed.created?.[i] ?? 0)),
       };
@@ -189,12 +226,31 @@ class SaveStore extends Emitter<{ settings: [] }> {
       // Keep only the last 60 days.
       const keys = Object.keys(d.dailyBest).sort();
       for (const k of keys.slice(0, Math.max(0, keys.length - 60))) delete d.dailyBest[k];
-    } else if (score > d.best) {
+    } else if (mode === "classic" && score > d.best) {
       newBest = score > 0;
       d.best = score;
     }
     this.save();
     return newBest;
+  }
+
+  levelStars(level: number): number {
+    return this.data.adventure.stars[level] ?? 0;
+  }
+
+  totalStars(): number {
+    return Object.values(this.data.adventure.stars).reduce((a, b) => a + b, 0);
+  }
+
+  /** Records a won level; returns true if the stars improved. */
+  recordLevel(level: number, stars: number): boolean {
+    const a = this.data.adventure;
+    const before = a.stars[level] ?? 0;
+    if (stars > before) a.stars[level] = stars;
+    a.unlocked = Math.max(a.unlocked, level + 1);
+    this.data.stats.levelsWon++;
+    this.save();
+    return stars > before;
   }
 
   setSnapshot(s: Snapshot | null): void {

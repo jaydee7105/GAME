@@ -1,17 +1,25 @@
 // App root: owns the playfield, the renderer and the UI, and moves between screens.
 
 import { Sound } from "./core/audio";
-import { exitApp, initPlatform } from "./core/platform";
+import { exitApp, initPlatform, isNative } from "./core/platform";
 import { Mode, Save, today } from "./core/save";
-import { COLORS } from "./game/planets";
-import { GameWorld } from "./game/world";
+import { PRIVACY_URL, disableReminders, enableReminders, maybeAskForReview, scheduleReminder, shareText } from "./core/social";
+import { goalText } from "./game/levels";
+import { COLORS, NAMES, PLURALS } from "./game/planets";
+import { FailReason, GameWorld, RunResult } from "./game/world";
+import { checkAchievements } from "./meta/achievements";
+import { Ads } from "./monetization/ads";
+import { BANNER_RESERVE, PACING } from "./monetization/config";
 import type { Assets } from "./render/assets";
 import { SceneRenderer } from "./render/scene";
-import { h } from "./ui/dom";
+import { demoAd, levelComplete, levelFailed, levelMap, reviveOffer } from "./ui/adventure-screens";
+import { awardsScreen, badge } from "./ui/awards";
+import { button, h } from "./ui/dom";
+import { icon } from "./ui/icons";
 import { Hud } from "./ui/hud";
 import { Screens } from "./ui/screens";
 
-type State = "title" | "game" | "paused" | "over";
+type State = "title" | "game" | "paused" | "revive" | "over";
 
 const BASE_W = 720;
 const BASE_H = 1280;
@@ -54,6 +62,10 @@ export class App {
     this.ui.append(this.hud.el, this.flash, screenHost);
     this.screens = new Screens(screenHost);
     this.screens.onCelebrate = () => this.confetti();
+    this.screens.onShare = (r) => this.share(r);
+    Ads.demoAd = (secs) => demoAd(screenHost, secs);
+    void Ads.init();
+    void scheduleReminder();
 
     w.on("discovered", (t) => {
       this.hud.refreshStrip(t);
@@ -63,20 +75,20 @@ export class App {
       }
     });
     w.on("seen", (t) => this.hud.refreshStrip(t));
-    w.on("supernova", () => this.flashScreen());
-    w.on("gameOver", (r) => {
-      this.state = "over";
-      Save.setSnapshot(null);
-      const newBest = Save.recordGame(r.mode, r.score, r.seconds);
-      this.endTutorial();
-      this.screens.gameOver(r, newBest, { again: () => this.startGame(this.world.mode), home: () => this.goHome(false) });
+    w.on("supernova", () => {
+      this.flashScreen();
+      this.checkAwards();
     });
+    w.on("fail", (reason) => this.onFail(reason));
+    w.on("gameOver", (r) => this.onGameOver(r));
+    w.on("levelComplete", (r) => this.onLevelComplete(r));
     w.on("powerupEarned", (kind, x, y) => {
       w.fx.text(this.clampX(x), y - 150, kind === "shake" ? "+1 Shake" : "+1 Black Hole", "#c9a6ff", 34, 60, 1.4);
     });
     w.on("chain", (n, x, y) => {
       const cols = ["#3fe0c5", "#ffd34d", "#ff9f2e", "#ff6fa8"];
       w.fx.text(this.clampX(x), y - 90, `CHAIN x${n}`, cols[Math.min(n - 2, 3)], 40 + Math.min(n, 6) * 4, 80, 1.1, (Math.random() - 0.5) * 0.16);
+      if (n >= 3) this.checkAwards();
     });
     w.on("firstDrop", () => {
       if (this.tutorialStep !== 0) return;
@@ -138,6 +150,8 @@ export class App {
     const forced = new URLSearchParams(location.search).get("notch");
     this.safeTop = forced ? Number(forced) : safe.top / this.scale;
     this.safeBottom = safe.bottom / this.scale;
+    // Keep room for the banner so the jar never moves when it appears.
+    if (Ads.reservesBanner) this.safeBottom += BANNER_RESERVE / this.scale;
     const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
     this.scene.resize(W, H, this.scale, dpr);
     this.ui.style.width = `${this.viewW}px`;
@@ -211,19 +225,43 @@ export class App {
       play: () => this.startGame("classic"),
       resume: () => this.continueGame(),
       daily: () => this.startGame("daily"),
-      settings: () => this.screens.settings(() => this.hud.refreshStrip()),
+      adventure: () => this.openMap(),
+      settings: () => this.openSettings(),
       planets: () => this.screens.planets(),
+      awards: () => awardsScreen(this.screens),
+    });
+    Ads.hideBanner();
+  }
+
+  private openSettings(): void {
+    this.screens.settings(() => this.hud.refreshStrip(), {
+      reminders: isNative ? async (on) => {
+        if (on) return enableReminders();
+        await disableReminders();
+        return false;
+      } : undefined,
+      privacyOptions: Ads.privacyOptionsRequired ? () => void Ads.privacyOptions() : undefined,
+      privacyPolicy: () => window.open(PRIVACY_URL, "_blank"),
     });
   }
 
-  startGame(mode: Mode): void {
+  openMap(): void {
+    levelMap(this.screens, (id) => this.startGame("adventure", id));
+  }
+
+  startGame(mode: Mode, level = 1): void {
     Save.setSnapshot(null);
     this.screens.closeAll();
     this.state = "game";
     this.hud.setVisible(true);
-    this.world.start(mode);
+    this.world.start(mode, level);
     this.hud.startRun();
     this.beginTutorial();
+    if (this.world.level && this.tutorialStep < 0) {
+      this.hud.showHint(this.world.level.goals.map((g) => goalText(g, NAMES, PLURALS)).join(" · "));
+      setTimeout(() => this.state === "game" && this.hud.hideHint(), 2600);
+    }
+    Ads.showBanner();
     Sound.play("start", 1, -3);
   }
 
@@ -237,6 +275,7 @@ export class App {
     this.state = "game";
     this.hud.setVisible(true);
     this.hud.startRun();
+    Ads.showBanner();
     Sound.play("start", 1, -3);
   }
 
@@ -278,6 +317,7 @@ export class App {
   }
 
   back(): void {
+    if (this.state === "revive") return;
     if (this.screens.pop()) return;
     switch (this.state) {
       case "game":
@@ -294,6 +334,121 @@ export class App {
         Save.flush();
         exitApp();
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // End of a run: revive offer, results, interstitials
+  // -------------------------------------------------------------------------
+  private onFail(reason: FailReason): void {
+    const w = this.world;
+    this.state = "revive";
+    w.cancelPress();
+    const canOffer = PACING.revivesPerRun > 0 && w.canRevive && Ads.rewardedAvailable();
+    if (!canOffer) {
+      w.finish();
+      return;
+    }
+    reviveOffer(this.screens, reason, {
+      accept: async () => {
+        this.screens.closeAll();
+        const rewarded = await Ads.showRewarded();
+        if (rewarded) {
+          w.revive();
+          this.state = "game";
+          this.last = performance.now();
+          this.checkAwards();
+        } else {
+          w.finish();
+        }
+      },
+      decline: () => {
+        this.screens.closeAll();
+        w.finish();
+      },
+    });
+  }
+
+  private onGameOver(r: RunResult): void {
+    this.state = "over";
+    Save.setSnapshot(null);
+    Ads.runFinished();
+    this.endTutorial();
+    const newBest = Save.recordGame(r.mode, r.score, r.seconds);
+    if (r.mode === "adventure") {
+      levelFailed(this.screens, r, [...this.world.goalProgress], {
+        retry: () => this.afterRun(() => this.startGame("adventure", r.level)),
+        map: () => this.afterRun(() => {
+          this.goHome(false);
+          this.openMap();
+        }),
+      });
+    } else {
+      this.screens.gameOver(r, newBest, {
+        again: () => this.afterRun(() => this.startGame(r.mode)),
+        home: () => this.afterRun(() => this.goHome(false)),
+      });
+      if (newBest) maybeAskForReview();
+    }
+    if (r.mode === "daily") void scheduleReminder();
+    this.checkAwards();
+    this.maybeOfferReminder(r);
+  }
+
+  private onLevelComplete(r: RunResult): void {
+    this.state = "over";
+    Save.setSnapshot(null);
+    Ads.runFinished();
+    Save.recordGame("adventure", r.score, r.seconds);
+    Save.recordLevel(r.level!, r.stars ?? 1);
+    levelComplete(this.screens, r, {
+      next: () => this.afterRun(() => this.startGame("adventure", r.level! + 1)),
+      map: () => this.afterRun(() => {
+        this.goHome(false);
+        this.openMap();
+      }),
+    });
+    if ((r.stars ?? 0) === 3 && r.level! >= 5) maybeAskForReview();
+    this.checkAwards();
+  }
+
+  /** Leaving a results screen is the natural break where an interstitial may run. */
+  private async afterRun(next: () => void): Promise<void> {
+    await Ads.maybeInterstitial();
+    next();
+  }
+
+  private checkAwards(): void {
+    for (const a of checkAchievements()) {
+      this.screens.notify("ACHIEVEMENT!", a.name, badge(a), "toast");
+      Sound.play("discover", 1.1, -3);
+    }
+  }
+
+  /** After a few games, offer the daily reminder once (Android only). */
+  private maybeOfferReminder(r: RunResult): void {
+    if (!isNative || Save.data.reminderAsked || Save.setting("reminders")) return;
+    if (r.mode !== "daily" && Save.data.stats.games < 4) return;
+    Save.data.reminderAsked = true;
+    Save.save();
+    setTimeout(() => {
+      if (this.state !== "over") return;
+      const panel = h("div", { class: "panel" },
+        h("h2", {}, "Daily reminder?"),
+        h("div", { class: "msg" }, "We can nudge you once a day when a new Daily Challenge is ready. No other notifications."),
+        button("YES, REMIND ME", "teal block", async () => {
+          this.screens.pop();
+          await enableReminders();
+        }),
+        button("NOT NOW", "ghost block small", () => this.screens.pop()));
+      this.screens.push(h("div", { class: "screen" }, panel));
+    }, 2500);
+  }
+
+  private async share(r: RunResult): Promise<void> {
+    const what = r.mode === "adventure" ? `cleared level ${r.level}` : `scored ${r.score.toLocaleString("en-US")}`;
+    const text = `I ${what} in Planet Drop and made ${NAMES[r.highest]}! Can you beat it?`;
+    const res = await shareText(text);
+    if (res === "copied") this.screens.notify("COPIED", "Paste it anywhere", h("i", { html: icon("share") }), "toast");
   }
 
   // -------------------------------------------------------------------------

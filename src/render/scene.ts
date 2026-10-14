@@ -4,6 +4,7 @@
 //   front (2D)    faces, Saturn's rings, aim guide, front glass, effects
 
 import { Save } from "../core/save";
+import { getTheme } from "../meta/themes";
 import { GLASS, Jar } from "../game/jar";
 import { COLORS, RADII, SATURN, SUN, collisionRadius } from "../game/planets";
 import type { GameWorld, Planet } from "../game/world";
@@ -222,9 +223,10 @@ export class SceneRenderer {
     const r = jar.rect;
     this.path(g, jar.outline(0));
     g.closePath();
+    const t = getTheme(Save.data.theme);
     const grad = g.createLinearGradient(0, r.y, 0, r.y + r.h);
-    grad.addColorStop(0, "rgba(107,128,255,0.05)");
-    grad.addColorStop(1, "rgba(107,128,255,0.13)");
+    grad.addColorStop(0, t.fillTop);
+    grad.addColorStop(1, t.fillBottom);
     g.fillStyle = grad;
     g.fill();
     const floor = g.createLinearGradient(0, r.y + r.h - 90, 0, r.y + r.h);
@@ -242,20 +244,30 @@ export class SceneRenderer {
 
   private drawJarFront(g: CanvasRenderingContext2D, jar: Jar): void {
     const r = jar.rect;
+    const t = getTheme(Save.data.theme);
     g.lineCap = "round";
     g.lineJoin = "round";
     this.path(g, jar.outline(-GLASS * 0.5));
-    g.strokeStyle = "rgba(158,179,255,0.28)";
+    if (t.glow !== "rgba(0,0,0,0)") {
+      g.save();
+      g.shadowColor = t.glow;
+      g.shadowBlur = 26;
+      g.strokeStyle = t.edge;
+      g.lineWidth = GLASS + 4;
+      g.stroke();
+      g.restore();
+    }
+    g.strokeStyle = t.edge;
     g.lineWidth = GLASS + 4;
     g.stroke();
-    g.strokeStyle = "rgba(204,219,255,0.55)";
+    g.strokeStyle = t.lip;
     g.lineWidth = GLASS * 0.45;
     g.stroke();
     this.path(g, jar.outline(1.5));
-    g.strokeStyle = "rgba(255,255,255,0.22)";
+    g.strokeStyle = t.inner;
     g.lineWidth = 2;
     g.stroke();
-    g.fillStyle = "rgba(217,230,255,0.85)";
+    g.fillStyle = t.cap;
     for (const x of [r.x - GLASS * 0.5, r.x + r.w + GLASS * 0.5]) {
       g.beginPath();
       g.arc(x, r.y, GLASS * 0.75, 0, Math.PI * 2);

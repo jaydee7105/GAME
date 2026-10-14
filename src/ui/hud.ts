@@ -2,6 +2,8 @@
 
 import { Save } from "../core/save";
 import { COUNT } from "../game/planets";
+import { goalText } from "../game/levels";
+import { NAMES, PLURALS } from "../game/planets";
 import type { GameWorld } from "../game/world";
 import { iconUrl } from "../render/sprites";
 import { button, formatScore, h } from "./dom";
@@ -25,6 +27,9 @@ export class Hud {
   private stripImgs: HTMLImageElement[] = [];
   private hint: HTMLDivElement;
   private finger: HTMLDivElement;
+  private goalsEl: HTMLDivElement;
+  private dropsEl: HTMLDivElement;
+  private dropsNum: HTMLElement;
   private shown = 0;
   private target = 0;
   private highest = -1;
@@ -57,7 +62,16 @@ export class Hud {
     this.hint = h("div", { class: "hint hidden" });
     this.finger = h("div", { class: "finger" });
     this.finger.style.display = "none";
-    this.el = h("div", { class: "hud" }, this.scoreWrap, this.next, this.pause, this.strip, this.bh, this.sh, this.finger, this.hint);
+    this.goalsEl = h("div", { class: "goals" });
+    this.dropsNum = h("b", {}, "0");
+    this.dropsEl = h("div", { class: "drops" }, this.dropsNum, h("span", {}, "DROPS"));
+    this.el = h("div", { class: "hud" }, this.scoreWrap, this.goalsEl, this.dropsEl, this.next, this.pause, this.strip, this.bh, this.sh, this.finger, this.hint);
+    world.on("goals", (progress) => this.renderGoals(progress));
+    world.on("dropsLeft", (n) => {
+      this.dropsNum.textContent = String(Math.max(n, 0));
+      this.dropsEl.classList.toggle("low", n <= 5);
+      this.dropsNum.animate([{ transform: "scale(1.25)" }, { transform: "scale(1)" }], { duration: 220, easing: "ease-out" });
+    });
 
     world.on("score", (score, gained) => this.onScore(score, gained));
     world.on("next", (t) => {
@@ -86,6 +100,8 @@ export class Hud {
       if (hgt !== undefined) el.style.height = `${hgt}px`;
     };
     place(this.scoreWrap, left, top - 6);
+    place(this.goalsEl, left, top + 104);
+    place(this.dropsEl, right - 88 - 128 - 112, top + 2);
     place(this.pause, right - 88, top, 88, 88);
     place(this.next, right - 88 - 128, top - 6);
     place(this.strip, left, j.bottom + 22, right - left, 64);
@@ -99,13 +115,35 @@ export class Hud {
 
   startRun(): void {
     const w = this.world;
-    this.modeEl.textContent = w.mode === "daily" ? "DAILY CHALLENGE" : "";
+    this.modeEl.textContent = w.mode === "daily" ? "DAILY CHALLENGE" : w.level ? `LEVEL ${w.level.id}` : "";
+    const adventure = Boolean(w.level);
+    this.goalsEl.style.display = adventure ? "" : "none";
+    this.dropsEl.style.display = adventure ? "" : "none";
+    this.bestEl.style.display = adventure ? "none" : "";
+    if (w.level) {
+      this.dropsNum.textContent = String(w.dropsLeft);
+      this.renderGoals(w.goalProgress);
+    }
     this.bestEl.textContent = "BEST " + formatScore(w.mode === "daily" ? Save.todaysDailyBest() : Save.data.best);
     this.shown = this.target = w.score;
     this.scoreEl.textContent = formatScore(w.score);
     this.highest = -1;
     this.refreshStrip();
     this.hideHint();
+  }
+
+  private renderGoals(progress: number[]): void {
+    const level = this.world.level;
+    if (!level) return;
+    this.goalsEl.replaceChildren(...level.goals.map((g, i) => {
+      const p = Math.min(progress[i] ?? 0, g.count);
+      const done = p >= g.count;
+      const iconEl = g.kind === "make"
+        ? h("img", { src: iconUrl(g.tier!, { face: false }), alt: "" })
+        : h("i", { html: icon(g.kind === "score" ? "star" : "planet") });
+      const label = g.kind === "score" ? `${formatScore(p)} / ${formatScore(g.count)}` : `${p} / ${g.count}`;
+      return h("div", { class: `goal${done ? " done" : ""}`, title: goalText(g, NAMES, PLURALS) }, iconEl, h("span", {}, done ? "✓" : label));
+    }));
   }
 
   refreshStrip(flashTier = -1): void {

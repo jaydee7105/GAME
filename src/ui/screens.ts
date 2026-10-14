@@ -4,7 +4,7 @@
 import { Sound } from "../core/audio";
 import { buzz } from "../core/platform";
 import { Mode, Save, SettingKey } from "../core/save";
-import { COUNT, FACTS, NAMES, SATURN, SUN } from "../game/planets";
+import { COUNT, FACTS, NAMES, PLURALS, SATURN, SUN } from "../game/planets";
 import type { RunResult } from "../game/world";
 import { iconUrl } from "../render/sprites";
 import { button, formatScore, h, popIn } from "./dom";
@@ -32,13 +32,26 @@ export class Screens {
   push(el: HTMLElement): HTMLElement {
     this.host.append(el);
     this.stack.push(el);
+    // Once a solid screen has faded in, hide what's under it.
+    if (el.classList.contains("solid")) setTimeout(() => this.updateCover(), 260);
     return el;
+  }
+
+  /** Hides screens that sit fully under a solid one. */
+  private updateCover(): void {
+    const all = [this.current, ...this.stack].filter((e): e is HTMLElement => e !== null);
+    let covered = false;
+    for (let i = all.length - 1; i >= 0; i--) {
+      all[i].style.visibility = covered ? "hidden" : "";
+      if (all[i].classList.contains("solid")) covered = true;
+    }
   }
 
   /** Closes the top-most pushed screen. Returns false if there was none. */
   pop(): boolean {
     const el = this.stack.pop();
     if (!el) return false;
+    this.updateCover();
     this.fadeOut(el);
     return true;
   }
@@ -61,7 +74,7 @@ export class Screens {
   // -------------------------------------------------------------------------
   // Title
   // -------------------------------------------------------------------------
-  title(h_: { play(): void; resume(): void; daily(): void; settings(): void; planets(): void }): void {
+  title(h_: { play(): void; resume(): void; daily(): void; adventure(): void; settings(): void; planets(): void; awards(): void }): void {
     const usable = this.viewH - this.safeTop - this.safeBottom;
     const el = h("div", { class: "screen clear title" });
     const orbit = new TitleOrbit();
@@ -78,6 +91,8 @@ export class Screens {
     } else {
       menu.append(button("PLAY", "primary big", h_.play));
     }
+    const lvl = Math.min(Save.data.adventure.unlocked, 100);
+    menu.append(button(`ADVENTURE<small>Level ${lvl}</small>`, "secondary small stacked", h_.adventure));
     menu.append(button("DAILY CHALLENGE", "teal small", h_.daily));
     const streak = Save.liveStreak();
     const todayBest = Save.todaysDailyBest();
@@ -86,8 +101,9 @@ export class Screens {
       streak > 0 ? " · " : null,
       todayBest > 0 ? `Today's best ${formatScore(todayBest)}` : "New puzzle every day"));
     menu.append(h("div", { class: "row" },
-      button(`${icon("planet")}Planets`, "ghost small", h_.planets),
-      button(`${icon("gear")}Settings`, "ghost small", h_.settings)));
+      button(`${icon("planet")}Planets`, "ghost small tile", h_.planets),
+      button(`${icon("trophy")}Awards`, "ghost small tile", h_.awards),
+      button(`${icon("gear")}Settings`, "ghost small tile", h_.settings)));
     [...menu.children].forEach((c, i) => ((c as HTMLElement).style.animationDelay = `${0.2 + i * 0.07}s`));
 
     const footer = h("div", { class: "footer", html: `${icon("trophy")}BEST&nbsp;&nbsp;${formatScore(Save.data.best)}` });
@@ -161,7 +177,9 @@ export class Screens {
       daily ? h("div", { class: "msg", style: { color: streak > 1 ? "var(--orange)" : "" } },
         streak > 1 ? `${streak} day streak! New challenge tomorrow.` : "Come back tomorrow for a new challenge.") : null,
       button("PLAY AGAIN", "primary block", h_.again),
-      button("HOME", "ghost block small", h_.home),
+      h("div", { class: "row2" },
+        button("HOME", "ghost small", h_.home),
+        button(`${icon("share")}SHARE`, "ghost small", () => this.onShare?.(r))),
     );
     const el = h("div", { class: "screen" }, panel);
     el.style.background = "rgba(8,5,26,.72)";
@@ -196,11 +214,13 @@ export class Screens {
 
   /** Hook so the app can fire confetti on the canvas. */
   onCelebrate?: () => void;
+  /** Hook for the results screen's Share button. */
+  onShare?: (r: RunResult) => void;
 
   // -------------------------------------------------------------------------
   // Settings
   // -------------------------------------------------------------------------
-  settings(onReset: () => void): void {
+  settings(onReset: () => void, extra: SettingsExtras = {}): void {
     const rows: [SettingKey, string, string][] = [
       ["music", "Music", "music"], ["sfx", "Sound effects", "sound"], ["haptics", "Vibration", "vibrate"],
       ["faces", "Cute faces", "face"], ["guide", "Aim guide", "guide"],
@@ -222,12 +242,14 @@ export class Screens {
             buzz(10, 0.3);
           });
           return h("div", { class: "setting" }, h("i", { html: icon(ic) }), h("span", {}, label), t);
-        })),
+        }), extra.reminders ? reminderRow(extra.reminders) : null),
         h("div", { class: "section" }, "YOUR STATS"),
         h("div", { class: "card grid2" }, ...([
           ["Games played", formatScore(s.games)], ["Best score", formatScore(Save.data.best)],
           ["Planets merged", formatScore(s.merges)], ["Supernovas", formatScore(s.supernovas)],
           ["Planets found", `${Save.discoveredCount()} / ${COUNT}`],
+          ["Levels cleared", formatScore(Save.data.adventure.unlocked - 1)], ["Adventure stars", formatScore(Save.totalStars())],
+          ["Longest chain", s.bestChain ? `x${s.bestChain}` : "-"],
           ["Time played", `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`],
         ].flatMap(([k, v]) => [h("div", { class: "k" }, k), h("div", {}, v)]))),
         button(confirmReset ? "Tap again to erase everything" : "Reset progress", confirmReset ? "pink block small" : "ghost block small", () => {
@@ -236,8 +258,12 @@ export class Screens {
           onReset();
           build(false);
         }),
+        ...[
+          extra.privacyOptions ? button(`${icon("shield")}Ad privacy choices`, "ghost block small", extra.privacyOptions) : null,
+          extra.privacyPolicy ? button("Privacy policy", "ghost block small", extra.privacyPolicy) : null,
+        ].filter((b): b is HTMLButtonElement => b !== null),
         h("div", { class: "about", html:
-          "Planet Drop v1.0.0<br>Planets modelled in Blender<br>Fredoka font by Milena Brandão (SIL Open Font License)<br>No ads. No tracking. Your progress stays on this device." }),
+          "Planet Drop v1.1.0<br>Planets modelled in Blender<br>Fredoka font by Milena Brandão (SIL Open Font License)<br>Your progress stays on this device." }),
       );
     };
     build();
@@ -271,7 +297,7 @@ export class Screens {
   private planetDetail(t: number): void {
     const known = Save.isDiscovered(t);
     const fact = known ? FACTS[t]
-      : t > 0 && Save.isDiscovered(t - 1) ? `Merge two ${NAMES[t - 1]}s to discover it.` : "Keep merging bigger planets to discover it.";
+      : t > 0 && Save.isDiscovered(t - 1) ? `Merge two ${PLURALS[t - 1]} to discover it.` : "Keep merging bigger planets to discover it.";
     const img = h("img", { src: iconUrl(t, { face: known && Save.setting("faces"), locked: !known, mood: "happy" }), alt: "" });
     if (t === SATURN || t === SUN) img.style.width = img.style.height = "330px";
     const panel = h("div", { class: "panel detail" },
@@ -288,7 +314,7 @@ export class Screens {
     popIn(img, 0.05);
   }
 
-  private topbar(title: string): HTMLElement {
+  topbar(title: string): HTMLElement {
     const back = button(icon("back"), "ghost round", () => this.pop());
     back.setAttribute("aria-label", "Back");
     return h("div", { class: "topbar" }, back, h("h1", {}, title));
@@ -297,11 +323,16 @@ export class Screens {
   // -------------------------------------------------------------------------
   // Banner
   // -------------------------------------------------------------------------
-  private bannerQueue: number[] = [];
+  private bannerQueue: { small: string; big: string; art: HTMLElement; cls: string }[] = [];
   private bannerBusy = false;
 
   banner(tier: number): void {
-    this.bannerQueue.push(tier);
+    this.notify("NEW PLANET!", NAMES[tier], h("img", { src: iconUrl(tier, { face: Save.setting("faces"), mood: "happy" }), alt: "" }));
+  }
+
+  /** Drops a small card in from the top (discoveries, achievements...). */
+  notify(small: string, big: string, art: HTMLElement, cls = ""): void {
+    this.bannerQueue.push({ small, big, art, cls });
     if (!this.bannerBusy) this.nextBanner();
   }
 
@@ -316,15 +347,13 @@ export class Screens {
   private bannerTimer = 0;
 
   private nextBanner(): void {
-    const tier = this.bannerQueue.shift();
-    if (tier === undefined) {
+    const item = this.bannerQueue.shift();
+    if (item === undefined) {
       this.bannerBusy = false;
       return;
     }
     this.bannerBusy = true;
-    const el = h("div", { class: "banner" },
-      h("img", { src: iconUrl(tier, { face: Save.setting("faces"), mood: "happy" }), alt: "" }),
-      h("div", {}, h("small", {}, "NEW PLANET!"), h("b", {}, NAMES[tier])));
+    const el = h("div", { class: `banner ${item.cls}`.trim() }, item.art, h("div", {}, h("small", {}, item.small), h("b", {}, item.big)));
     el.style.top = `${this.safeTop + 150}px`;
     this.host.append(el);
     this.bannerTimer = window.setTimeout(() => {
@@ -332,6 +361,24 @@ export class Screens {
       this.nextBanner();
     }, 2850);
   }
+}
+
+export interface SettingsExtras {
+  /** Daily reminder switch (native only). Resolves to the new state. */
+  reminders?: (on: boolean) => Promise<boolean>;
+  /** Opens the ad consent form (only where the law requires the option). */
+  privacyOptions?: () => void;
+  privacyPolicy?: () => void;
+}
+
+function reminderRow(set: (on: boolean) => Promise<boolean>): HTMLElement {
+  const t = h("button", { class: `toggle${Save.setting("reminders") ? " on" : ""}`, type: "button", "aria-label": "Daily reminder" });
+  t.addEventListener("click", async () => {
+    Sound.play("click", 1, -4);
+    const on = await set(!Save.setting("reminders"));
+    t.classList.toggle("on", on);
+  });
+  return h("div", { class: "setting" }, h("i", { html: icon("bell") }), h("span", {}, "Daily reminder"), t);
 }
 
 function quickToggle(key: SettingKey, ic: string): HTMLButtonElement {

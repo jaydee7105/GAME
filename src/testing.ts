@@ -3,7 +3,10 @@
 
 import type { App } from "./app";
 import { Save } from "./core/save";
+import { getLevel } from "./game/levels";
 import { COUNT, SUN } from "./game/planets";
+import { levelIntro } from "./ui/adventure-screens";
+import { awardsScreen } from "./ui/awards";
 
 const wait = (s: number) => new Promise((r) => setTimeout(r, s * 1000));
 
@@ -16,9 +19,12 @@ function until(pred: () => boolean, timeout = 30): Promise<void> {
   });
 }
 
-function mark(label: string): void {
-  (window as unknown as { sceneStep: string }).sceneStep = label;
+/** Marks a moment as ready and waits until the capture tool has taken its shot. */
+async function mark(label: string): Promise<void> {
+  const win = window as unknown as { sceneStep: string; sceneAck?: string };
+  win.sceneStep = label;
   console.log("[scene]", label);
+  await until(() => win.sceneAck === label, 8);
 }
 
 export async function runTestScene(app: App, scene: string): Promise<void> {
@@ -27,24 +33,25 @@ export async function runTestScene(app: App, scene: string): Promise<void> {
   switch (scene) {
     case "title":
       await wait(1.2);
-      mark("title");
+      await mark("title");
       break;
     case "autoplay":
       Save.data.tutorialDone = true;
       app.startGame("classic");
       w.autoplay = true;
-      mark("running");
+      await mark("running");
       break;
     case "tutorial":
       Save.data.tutorialDone = false;
       app.startGame("classic");
       await wait(1.2);
-      mark("tutorial");
+      await mark("tutorial");
       break;
     case "showcase": {
       // A good-looking mid-game jar.
       for (let i = 0; i < COUNT; i++) Save.data.discovered[i] = i <= 9;
       Save.data.tutorialDone = true;
+      Save.data.best = 6240;
       app.startGame("classic");
       w.debugNoDanger();
       const j = w.jar.rect;
@@ -63,7 +70,7 @@ export async function runTestScene(app: App, scene: string): Promise<void> {
       await wait(3.5);
       w.dropTargetX = j.x + j.w * 0.62;
       await wait(1.0);
-      mark("showcase");
+      await mark("showcase");
       await wait(1.5);
       // Two Neptunes meeting mid-air make an Uranus, for an action shot.
       const merges = w.merges;
@@ -72,11 +79,12 @@ export async function runTestScene(app: App, scene: string): Promise<void> {
       await until(() => w.merges > merges);
       const t0 = w.time;
       await until(() => w.time - t0 > 0.12);
-      mark("merge");
+      await mark("merge");
       break;
     }
     case "supernova": {
       Save.data.tutorialDone = true;
+      Save.data.best = 6240;
       app.startGame("classic");
       await wait(0.6);
       const j = w.jar.rect;
@@ -87,7 +95,7 @@ export async function runTestScene(app: App, scene: string): Promise<void> {
       await until(() => w.supernovas > 0);
       const t0 = w.time;
       await until(() => w.time - t0 > 0.35);
-      mark("supernova");
+      await mark("supernova");
       break;
     }
     case "powerups": {
@@ -97,20 +105,20 @@ export async function runTestScene(app: App, scene: string): Promise<void> {
       await wait(10);
       w.autoplay = false;
       await wait(1.5);
-      mark("before");
+      await mark("before");
       await wait(1.0);
       w.useShake();
       await wait(0.3);
-      mark("shake");
+      await mark("shake");
       await wait(2.5);
       w.toggleBlackHole();
       await wait(0.5);
-      mark("aiming");
+      await mark("aiming");
       await wait(1.0);
       w.toggleBlackHole();
       w.swallow(w.planets[0]);
       await wait(0.4);
-      mark("swallow");
+      await mark("swallow");
       break;
     }
     case "pause":
@@ -120,7 +128,7 @@ export async function runTestScene(app: App, scene: string): Promise<void> {
       await wait(4);
       app.pauseGame();
       await wait(0.6);
-      mark("pause");
+      await mark("pause");
       break;
     case "resume": {
       Save.data.tutorialDone = true;
@@ -130,16 +138,16 @@ export async function runTestScene(app: App, scene: string): Promise<void> {
       w.autoplay = false;
       await wait(2);
       const before = w.planets.length;
-      mark("before");
+      await mark("before");
       await wait(0.5);
       app.goHome(true);
       await wait(1.2);
-      mark("title_continue");
+      await mark("title_continue");
       await wait(0.5);
       app.continueGame();
       await wait(0.6);
       console.log(`[scene] resume before=${before} after=${w.planets.length} score=${w.score}`);
-      mark("after");
+      await mark("after");
       break;
     }
     case "gameover": {
@@ -158,7 +166,7 @@ export async function runTestScene(app: App, scene: string): Promise<void> {
       const final = w.score.toLocaleString("en-US");
       await until(() => document.querySelector(".result .big")?.textContent === final);
       await wait(1.2);
-      mark("gameover");
+      await mark("gameover");
       break;
     }
     case "collection":
@@ -168,12 +176,76 @@ export async function runTestScene(app: App, scene: string): Promise<void> {
       }
       app.screens.planets();
       await wait(0.8);
-      mark("collection");
+      await mark("collection");
       break;
+    case "map":
+      Save.data.adventure.unlocked = 14;
+      for (let i = 1; i < 14; i++) Save.data.adventure.stars[i] = 1 + (i % 3);
+      app.openMap();
+      await wait(1.2);
+      await mark("map");
+      break;
+    case "intro": {
+      levelIntro(app.screens, getLevel(12), () => app.startGame("adventure", 12));
+      await wait(0.8);
+      await mark("intro");
+      break;
+    }
+    case "level":
+      Save.data.tutorialDone = true;
+      app.startGame("adventure", 12);
+      w.autoplay = true;
+      await wait(6);
+      w.autoplay = false;
+      await wait(1.5);
+      await mark("level");
+      break;
+    case "revive":
+      Save.data.tutorialDone = true;
+      app.startGame("classic");
+      w.autoplay = true;
+      await wait(5);
+      w.autoplay = false;
+      w.end("overflow");
+      await until(() => app.state === "revive" && !!document.querySelector(".revive"));
+      await wait(0.6);
+      await mark("offer");
+      (document.querySelector(".revive .btn.teal") as HTMLButtonElement).click();
+      await wait(1.0);
+      await mark("demoad");
+      await until(() => app.state === "game");
+      await wait(0.5);
+      await mark("revived");
+      break;
+    case "complete":
+      Save.data.tutorialDone = true;
+      app.startGame("adventure", 7);
+      await wait(1);
+      w.debugNoDanger();
+      for (const [t, x] of [[6, 150], [5, 330], [4, 480], [3, 590], [2, 250], [1, 420], [0, 540]] as const) w.debugSpawn(t, x, 760);
+      await wait(1.5);
+      (w as unknown as { score: number }).score = 486;
+      (w as unknown as { dropsLeft: number }).dropsLeft = 20;
+      (w as unknown as { win(): void }).win();
+      await until(() => !!document.querySelector(".result"));
+      await wait(1.6);
+      await mark("complete");
+      break;
+    case "awards": {
+      Save.data.achievements = { first: 1, earth: 1, saturn: 1, chain3: 1, score1k: 1, games25: 1 };
+      Save.data.stats.merges = 320;
+      awardsScreen(app.screens);
+      await wait(0.8);
+      await mark("achievements");
+      (document.querySelectorAll(".tab")[1] as HTMLButtonElement).click();
+      await wait(0.5);
+      await mark("styles");
+      break;
+    }
     case "settings":
       app.screens.settings(() => {});
       await wait(0.8);
-      mark("settings");
+      await mark("settings");
       break;
   }
 }

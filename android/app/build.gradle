@@ -9,7 +9,9 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         // CI passes -PversionCode=<n> so every upload is higher than the last.
         versionCode((project.findProperty("versionCode") ?: "1") as Integer)
-        versionName "1.0.0"
+        versionName "1.1.0"
+        // Google's sample AdMob app id unless CI provides the real one.
+        manifestPlaceholders = [admobAppId: System.getenv("ADMOB_APP_ID") ?: "ca-app-pub-3940256099942544~3347511713"]
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

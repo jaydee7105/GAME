@@ -37,6 +37,7 @@ const steps = (args.steps ?? args.scene ?? "title").split(",");
 for (const step of steps) {
   await page.waitForFunction((s) => window.sceneStep === s, step, { timeout: 60000 });
   await page.screenshot({ path: `${out}/${step}.png` });
+  await page.evaluate((s) => (window.sceneAck = s), step);
   console.log("saved", `${out}/${step}.png`);
 }
 if (args.wait) await page.waitForTimeout(Number(args.wait) * 1000);

@@ -9,6 +9,13 @@ name: Android build
 #   ANDROID_KEYSTORE_ALIAS    key alias
 #   ANDROID_KEYSTORE_PASSWORD keystore / key password
 # Without them a throwaway key is used: fine for testing, NOT for uploading.
+#
+# Ads: add these secrets from your AdMob account (see docs/PUBLISHING.md)
+#   ADMOB_APP_ID              ca-app-pub-XXXX~YYYY
+#   ADMOB_BANNER_ID           ca-app-pub-XXXX/1111
+#   ADMOB_INTERSTITIAL_ID     ca-app-pub-XXXX/2222
+#   ADMOB_REWARDED_ID         ca-app-pub-XXXX/3333
+# Without them Google's test ads are shown (safe, but they earn nothing).
 
 on:
   push:
@@ -59,7 +66,14 @@ jobs:
           cache: gradle
 
       - name: Build web app and sync into Android
+        env:
+          VITE_ADMOB_BANNER_ID: ${{ secrets.ADMOB_BANNER_ID }}
+          VITE_ADMOB_INTERSTITIAL_ID: ${{ secrets.ADMOB_INTERSTITIAL_ID }}
+          VITE_ADMOB_REWARDED_ID: ${{ secrets.ADMOB_REWARDED_ID }}
         run: |
+          if [ -z "$VITE_ADMOB_BANNER_ID" ]; then
+            echo "::warning::No AdMob secrets set - this build shows Google test ads and earns nothing."
+          fi
           npm ci
           npm run build
           npx cap sync android
@@ -85,6 +99,8 @@ jobs:
 
       - name: Build App Bundle and APK
         working-directory: android
+        env:
+          ADMOB_APP_ID: ${{ secrets.ADMOB_APP_ID }}
         run: |
           # Every CI run gets a higher version code, as Google Play requires.
           code=$(( ${{ github.run_number }} + 100 ))

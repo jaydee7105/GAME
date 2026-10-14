@@ -18,6 +18,9 @@ const P: Record<string, string> = {
   blackhole: `<path d="M12 3.5a8.5 8.5 0 0 1 8.4 7.2M20.5 12a8.5 8.5 0 0 1-7.2 8.4M12 20.5a8.5 8.5 0 0 1-8.4-7.2M3.5 12a8.5 8.5 0 0 1 7.2-8.4" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><path d="M12 7.2a4.8 4.8 0 0 1 4.8 4.8M12 16.8A4.8 4.8 0 0 1 7.2 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="2.4"/>`,
   shake: `<rect x="7" y="7" width="10" height="10" rx="2.6"/><path d="M3.2 8.2a8.6 8.6 0 0 0 0 7.6M20.8 8.2a8.6 8.6 0 0 1 0 7.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`,
   close: `<path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>`,
+  share: `<circle cx="18" cy="5.5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="18.5" r="3"/><path d="M8.6 10.6l6.8-3.8M8.6 13.4l6.8 3.8" stroke="currentColor" stroke-width="2.2"/>`,
+  bell: `<path d="M12 3a6 6 0 0 0-6 6v4.2L4.3 16c-.4.7.1 1.5.9 1.5h13.6c.8 0 1.3-.8.9-1.5L18 13.2V9a6 6 0 0 0-6-6z"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0z"/>`,
+  shield: `<path d="M12 2.5 4 5.6v6c0 4.6 3.4 8.6 8 9.9 4.6-1.3 8-5.3 8-9.9v-6z"/>`,
   star: `<path d="m12 2.8 2.7 5.9 6.4.7-4.8 4.3 1.3 6.3L12 16.8 6.4 20l1.3-6.3L2.9 9.4l6.4-.7z"/>`,
 };
 

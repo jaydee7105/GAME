@@ -19,6 +19,8 @@ SHOTS = [
     ("showcase.png", "Drop & merge", "cute planets"),
     ("showcase_merge.png", "Grow them bigger", "and bigger..."),
     ("supernova.png", "Make two Suns for a", "SUPERNOVA!"),
+    ("map.png", "100 levels", "to explore"),
+    ("complete.png", "Clear goals,", "earn every star"),
     ("collection.png", "Discover", "every planet"),
     ("title.png", "A new Daily Challenge", "every day"),
     ("gameover.png", "Beat your", "best score"),

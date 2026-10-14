@@ -8,6 +8,8 @@ technology (TypeScript, WebGL, HTML/CSS) and packaged for Android with Capacitor
 
 ## Features
 
+- **Classic** endless mode, a **Daily Challenge**, and **Adventure**: 100
+  levels in 10 chapters with goals, limited drops, stars and boss levels
 - 11 planets, from Asteroid to Sun, modelled procedurally in Blender
   (`art/blender/`) and lit live in WebGL, so they can roll while the light
   stays put
@@ -15,10 +17,18 @@ technology (TypeScript, WebGL, HTML/CSS) and packaged for Android with Capacitor
   **Supernova** when two Suns merge
 - Power-ups: **Black Hole** (remove a planet) and **Shake** (jolt the jar)
 - **Daily Challenge** with the same drop sequence for everyone, plus streaks
+- "Fair" drops that favour planets you can actually merge (like Block Blast's
+  board-aware piece picker)
+- 22 achievements that unlock 7 cosmetic jar styles
 - Planet collection with fun facts, stats, and a first-run tutorial
+- Ad-supported the Block Blast way: bottom banner in play, paced interstitials
+  between games, and one optional rewarded "Keep going?" revive per run
+  (see [docs/MONETISATION.md](docs/MONETISATION.md))
+- Share your score, an occasional Play review prompt, and an opt-in daily
+  reminder notification
 - Your run is saved automatically and resumes after the app is closed
 - Synthesized sound effects and ambient music (`art/audio/synth.py`)
-- Haptics, safe-area support, Android back button, works offline, no ads or tracking
+- Haptics, safe-area support, Android back button, plays fully offline
 
 ## Quick start
 
@@ -34,10 +44,12 @@ npm run dev        # play at http://localhost:5173 (mouse: drag to aim, release 
 | `src/game/` | Rules and physics: world, jar, planets, effects |
 | `src/render/` | WebGL planet lighting, 2D scene, faces, icons |
 | `src/ui/` | HTML/CSS HUD and screens |
-| `src/core/` | Save data, audio, haptics/back button (Capacitor), tweens |
+| `src/core/` | Save data, audio, haptics/back button, share/review/reminders |
+| `src/monetization/` | AdMob placements and pacing |
+| `src/meta/` | Achievements and jar styles |
 | `public/assets/` | Planet textures, backdrop, audio, font (all generated, see below) |
 | `android/` | Capacitor Android project |
-| `tools/` | Playwright smoke test and screenshot capture |
+| `tools/` | Playwright smoke test, screenshot capture, level simulator |
 | `art/` | Sources that generate the assets (Blender, audio synth, store art) |
 | `store/` | Play Store icon, feature graphic, screenshots and listing text |
 | `docs/` | Publishing guide and privacy policy |
@@ -50,6 +62,13 @@ npm test           # plays the game with touch input in headless Chrome
 ```
 
 CI runs the same smoke test on every push before building Android.
+
+Adventure levels are balanced with a headless bot that plays each level many
+times (`SKILL=0.85` by default):
+
+```bash
+npx tsx tools/sim.ts 1 20 8      # levels 1..20, 8 attempts each
+```
 
 ## Android
 
@@ -81,5 +100,6 @@ python art/tools/store_screens.py shots
 ```
 
 Capture scenes: `title`, `showcase`, `supernova`, `powerups`, `pause`,
-`resume`, `gameover`, `collection`, `settings`, `tutorial`, `autoplay`
+`resume`, `gameover`, `collection`, `settings`, `tutorial`, `autoplay`,
+`map`, `intro`, `level`, `revive`, `complete`, `awards`
 (add `?scene=<name>` to the game URL to watch one).

@@ -1,7 +1,7 @@
 {
   "name": "planet-drop",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Drop planets, merge them into bigger ones, and grow your way to the Sun.",
   "type": "module",
   "scripts": {
@@ -29,6 +29,7 @@
     "@capacitor/assets": "3.0.5",
     "@capacitor/cli": "8.5.3",
     "playwright-core": "1.63.0",
+    "tsx": "4.23.15",
     "typescript": "5.9.3",
     "vite": "8.3.4"
   }

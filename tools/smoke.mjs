@@ -79,6 +79,37 @@ await page.waitForTimeout(800);
 const restored = await page.evaluate(() => window.planetDrop.world.planets.length);
 check(restored === s.planets || restored > 0, `continue restores the jar (${restored} planets)`);
 
+// Adventure: the map opens, level 1 starts with goals and a drop counter.
+await page.tap("button[aria-label=Pause]");
+await page.waitForTimeout(400);
+await page.tap("text=SAVE & QUIT");
+await page.waitForTimeout(800);
+await page.tap("text=ADVENTURE");
+await page.waitForTimeout(800);
+check(await page.isVisible(".map"), "Adventure opens the level map");
+await page.tap(".node.current", { force: true }); // it pulses, so never "stable"
+await page.waitForTimeout(600);
+await page.tap("text=PLAY");
+await page.waitForTimeout(1200);
+const adv = await page.evaluate(() => ({
+  state: window.planetDrop.app.state, mode: window.planetDrop.world.mode, drops: window.planetDrop.world.dropsLeft,
+}));
+check(adv.state === "game" && adv.mode === "adventure" && adv.drops > 0, `level 1 starts (drops left=${adv.drops})`);
+check(await page.isVisible(".goals .goal"), "level goals are shown in the HUD");
+
+// Running out of drops offers the rewarded revive once, which adds drops.
+await page.evaluate(() => {
+  const w = window.planetDrop.world;
+  w.dropsLeft = 0;
+  w.end("drops");
+});
+await page.waitForTimeout(1600);
+check(await page.isVisible("text=Watch video"), "failing offers a revive");
+await page.tap("text=Watch video");
+await page.waitForTimeout(4800);
+const rev = await page.evaluate(() => ({ state: window.planetDrop.app.state, drops: window.planetDrop.world.dropsLeft, can: window.planetDrop.world.canRevive }));
+check(rev.state === "game" && rev.drops > 0 && !rev.can, `revive continues the level (drops left=${rev.drops})`);
+
 check(errors.length === 0, `no page errors${errors.length ? ":\n  " + errors.join("\n  ") : ""}`);
 await browser.close();
 process.exit(failed ? 1 : 0);

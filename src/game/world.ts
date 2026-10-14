@@ -11,6 +11,7 @@ import { ease, Tweens } from "../core/tween";
 import { FaceState } from "../render/face";
 import { Fx } from "./fx";
 import { GLASS, INNER_H, INNER_W, Jar } from "./jar";
+import { Level, getLevel, starsFor } from "./levels";
 import * as P from "./planets";
 
 /** Pixels per physics metre. */
@@ -31,7 +32,16 @@ export interface RunResult {
   supernovas: number;
   bestChain: number;
   seconds: number;
+  /** Adventure only. */
+  level?: number;
+  won?: boolean;
+  stars?: number;
+  dropsLeft?: number;
+  reason?: FailReason;
 }
+
+/** Why a run stopped: the jar overflowed, or (Adventure) the drops ran out. */
+export type FailReason = "overflow" | "drops";
 
 type WorldEvents = {
   score: [score: number, gained: number];
@@ -46,7 +56,13 @@ type WorldEvents = {
   firstDrop: [];
   firstMerge: [];
   danger: [level: number];
+  /** The run has stopped; the app may offer a revive before calling finish(). */
+  fail: [reason: FailReason];
   gameOver: [result: RunResult];
+  /** Adventure goals: progress per goal, and drops remaining. */
+  goals: [progress: number[]];
+  dropsLeft: [left: number];
+  levelComplete: [result: RunResult];
 };
 
 /** A planet: physical while in the jar, or a purely visual ghost while it animates away. */
@@ -96,6 +112,17 @@ export class GameWorld extends Emitter<WorldEvents> {
   supernovas = 0;
   bestChain = 0;
   elapsed = 0;
+
+  /** Adventure state. */
+  level: Level | null = null;
+  dropsLeft = 0;
+  goalProgress: number[] = [];
+  revived = false;
+  failReason: FailReason = "overflow";
+  /** Classic/Adventure only: nudge the dropper towards useful planets. */
+  fairDrops = true;
+  private settleTimer = -1;
+  private won = false;
 
   planets: Planet[] = [];
   ghosts: Planet[] = [];
@@ -188,10 +215,15 @@ export class GameWorld extends Emitter<WorldEvents> {
   // -------------------------------------------------------------------------
   // Run lifecycle
   // -------------------------------------------------------------------------
-  start(mode: Mode): void {
+  start(mode: Mode, levelId = 1): void {
     this.clear();
     this.mode = mode;
+    this.level = mode === "adventure" ? getLevel(levelId) : null;
     this.rng = new Rng(mode === "daily" ? dailySeed() : undefined);
+    this.revived = false;
+    this.won = false;
+    this.dropsLeft = this.level?.drops ?? 0;
+    this.goalProgress = this.level ? this.level.goals.map(() => 0) : [];
     this.score = 0;
     this.blackHoles = 1;
     this.shakes = 1;
@@ -203,6 +235,14 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.elapsed = 0;
     this.currentTier = this.roll(true);
     this.nextTier = this.roll(true);
+    if (this.level) {
+      for (const [t, fx, fy] of this.level.start) {
+        const r = P.RADII[t];
+        const x = Math.min(Math.max(this.jar.left + fx * this.jar.rect.w, this.jar.left + r), this.jar.right - r);
+        const y = Math.min(this.jar.top + fy * this.jar.rect.h, this.jar.bottom - r);
+        this.spawn(t, x, y).age = 3;
+      }
+    }
     this.begin();
   }
 
@@ -223,6 +263,11 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.elapsed = s.elapsed;
     this.rng = new Rng();
     this.rng.state = s.rng >>> 0;
+    this.level = s.mode === "adventure" && s.level ? getLevel(s.level) : null;
+    this.revived = Boolean(s.revived);
+    this.won = false;
+    this.dropsLeft = s.dropsLeft ?? this.level?.drops ?? 0;
+    this.goalProgress = this.level ? this.level.goals.map((_, i) => s.goals?.[i] ?? 0) : [];
     for (const d of s.planets) {
       const p = this.spawn(d.t, d.x + this.jar.left, d.y + this.jar.top);
       p.body!.setAngle(d.r);
@@ -250,6 +295,7 @@ export class GameWorld extends Emitter<WorldEvents> {
       blackHoles: this.blackHoles, shakes: this.shakes, highest: this.highest, merges: this.merges,
       drops: this.drops, supernovas: this.supernovas, bestChain: this.bestChain, elapsed: this.elapsed,
       rng: this.rng.state, planets,
+      level: this.level?.id, revived: this.revived, dropsLeft: this.dropsLeft, goals: this.goalProgress,
     };
   }
 
@@ -267,6 +313,8 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.emit("score", this.score, 0);
     this.emit("next", this.nextTier);
     this.emit("powerups", this.blackHoles, this.shakes);
+    this.emit("goals", this.goalProgress);
+    this.emit("dropsLeft", this.dropsLeft);
   }
 
   stop(): void {
@@ -285,18 +333,44 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.isOver = false;
     this.jar.danger = 0;
     this.acc = 0;
+    this.settleTimer = -1;
   }
 
   private roll(opening = false): number {
     // The first drops are always small so every run starts gently.
-    const limit = opening ? 3 : P.DROPPABLE;
+    const max = this.level ? this.level.maxDrop + 1 : P.DROPPABLE;
+    const limit = Math.min(opening ? 3 : P.DROPPABLE, max);
     const weights = P.DROP_WEIGHTS.slice(0, limit);
+    // Fair drops (like Block Blast's board-aware pieces): planets that sit on
+    // top of the pile and can be matched right away become more likely, more
+    // so when the jar is getting full. The daily challenge stays pure luck so
+    // everyone gets the same sequence.
+    if (this.fairDrops && this.mode !== "daily" && !opening) {
+      const top = this.exposedTiers();
+      const boost = 0.6 + 1.4 * this.jar.danger + (this.planets.length > 18 ? 0.4 : 0);
+      for (const t of top) if (t < limit) weights[t] *= 1 + boost;
+    }
     let x = this.rng.next() * weights.reduce((a, b) => a + b, 0);
     for (let i = 0; i < limit; i++) {
       x -= weights[i];
       if (x <= 0) return i;
     }
     return 0;
+  }
+
+  /** Tiers of planets on the surface of the pile (reachable by a drop). */
+  private exposedTiers(): Set<number> {
+    const out = new Set<number>();
+    const cols = 8;
+    for (let c = 0; c < cols; c++) {
+      const x = this.jar.left + (c + 0.5) * (this.jar.rect.w / cols);
+      let best: Planet | null = null;
+      for (const p of this.planets) {
+        if (Math.abs(p.x - x) < p.radius && (!best || p.y - p.radius < best.y - best.radius)) best = p;
+      }
+      if (best) out.add(best.tier);
+    }
+    return out;
   }
 
   // -------------------------------------------------------------------------
@@ -350,6 +424,12 @@ export class GameWorld extends Emitter<WorldEvents> {
     p.body!.setAngularVelocity(this.rng.range(-0.6, 0.6));
     this.drops++;
     Save.addStat("drops");
+    if (this.level) {
+      this.dropsLeft--;
+      this.emit("dropsLeft", this.dropsLeft);
+      // Out of drops: let the jar settle, then see whether the goals were met.
+      if (this.dropsLeft <= 0) this.settleTimer = 2.4;
+    }
     if (Save.markSeen(tier)) this.emit("seen", tier);
     if (this.drops === 1) this.emit("firstDrop");
     Sound.play("drop", (0.95 + Math.random() * 0.11) * (1.15 - tier * 0.06), -3);
@@ -361,7 +441,7 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.currentTier = this.nextTier;
     this.nextTier = this.roll(this.drops < 3);
     this.emit("next", this.nextTier);
-    this.cooldown = DROP_COOLDOWN;
+    this.cooldown = this.level && this.dropsLeft <= 0 ? Infinity : DROP_COOLDOWN;
   }
 
   private spawn(tier: number, x: number, y: number, growFrom = -1): Planet {
@@ -443,6 +523,12 @@ export class GameWorld extends Emitter<WorldEvents> {
       if (this.isOver) break;
     }
     this.syncBodies();
+
+    // Adventure: out of drops - wait for the jar to settle, then judge.
+    if (this.settleTimer > 0 && !this.isOver) {
+      this.settleTimer -= dt;
+      if (this.settleTimer <= 0 && !this.won) this.end("drops");
+    }
   }
 
   private physicsStep(): void {
@@ -512,6 +598,7 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.chainCount = this.elapsed - this.lastMergeTime < CHAIN_WINDOW ? this.chainCount + 1 : 1;
     this.lastMergeTime = this.elapsed;
     this.bestChain = Math.max(this.bestChain, this.chainCount);
+    if (this.bestChain > Save.data.stats.bestChain) Save.data.stats.bestChain = this.bestChain;
     this.merges++;
     Save.addStat("merges");
     if (this.merges === 1) this.emit("firstMerge");
@@ -546,6 +633,7 @@ export class GameWorld extends Emitter<WorldEvents> {
       Sound.play("chain", 1 + 0.08 * Math.min(this.chainCount - 2, 6), -4);
     }
     if (Save.discover(nt)) this.emit("discovered", nt);
+    this.updateGoals(nt);
     if (nt === 8) this.award("shake", x, y);
     else if (nt === 9) this.award("blackHole", x, y);
   }
@@ -588,6 +676,57 @@ export class GameWorld extends Emitter<WorldEvents> {
   private addScore(n: number): void {
     this.score += n;
     this.emit("score", this.score, n);
+    this.updateGoals();
+  }
+
+  /** Recomputes Adventure goal progress and wins the level when all are met. */
+  private updateGoals(madeTier = -1): void {
+    if (!this.level || this.won) return;
+    this.level.goals.forEach((g, i) => {
+      if (g.kind === "make" && g.tier === madeTier) this.goalProgress[i]++;
+      else if (g.kind === "score") this.goalProgress[i] = this.score;
+      else if (g.kind === "merges") this.goalProgress[i] = this.merges;
+    });
+    this.emit("goals", this.goalProgress);
+    const done = this.level.goals.every((g, i) => this.goalProgress[i] >= g.count);
+    if (done) this.win();
+  }
+
+  /** Every Adventure goal met: celebrate, then report the result. */
+  private win(): void {
+    if (this.won || !this.level) return;
+    this.won = true;
+    this.running = false;
+    this.isOver = true;
+    this.dropReady = false;
+    this.pressing = false;
+    this.settleTimer = -1;
+    if (this.aimingBlackHole) {
+      this.aimingBlackHole = false;
+      this.emit("aiming", false);
+    }
+    for (const p of this.planets) p.face.cheer(10);
+    const stars = starsFor(this.level, this.dropsLeft);
+    this.fx.text(this.jar.centerX, this.jar.top + 220, "LEVEL COMPLETE!", "#ffd34d", 60, 90, 1.8);
+    for (let i = 0; i < 5; i++) {
+      void this.tweens.wait(i * 0.12).then(() => {
+        const x = this.jar.left + 80 + Math.random() * (this.jar.rect.w - 160);
+        const y = this.jar.top + 120 + Math.random() * 300;
+        this.fx.burst(x, y, ["#ffd34d", "#ff6fa8", "#3fe0c5", "#ff9f2e", "#7b6cff"][i], 30, 420, 1.5, 1.0);
+      });
+    }
+    Sound.play("highscore", 1, -1, 0);
+    buzz(120, 0.6);
+    const result: RunResult = { ...this.resultBase(), won: true, stars, dropsLeft: this.dropsLeft, level: this.level.id };
+    void this.tweens.wait(1.6).then(() => this.emit("levelComplete", result));
+  }
+
+  private resultBase(): RunResult {
+    return {
+      mode: this.mode, score: this.score, highest: this.highest, merges: this.merges,
+      drops: this.drops, supernovas: this.supernovas, bestChain: this.bestChain, seconds: this.elapsed,
+      level: this.level?.id, reason: this.failReason,
+    };
   }
 
   private checkDanger(dt: number): void {
@@ -615,12 +754,14 @@ export class GameWorld extends Emitter<WorldEvents> {
       this.jar.danger = level;
       this.emit("danger", level);
     }
-    if (this.dangerTime >= DANGER_GRACE) this.end();
+    if (this.dangerTime >= DANGER_GRACE) this.end("overflow");
   }
 
-  /** Ends the run (also used by the store-screenshot tooling). */
-  end(): void {
+  /** Stops the run. The app may then offer a revive, or call finish(). */
+  end(reason: FailReason = "overflow"): void {
     if (this.isOver) return;
+    this.failReason = reason;
+    this.settleTimer = -1;
     this.isOver = true;
     this.running = false;
     this.dropReady = false;
@@ -629,17 +770,59 @@ export class GameWorld extends Emitter<WorldEvents> {
       this.aimingBlackHole = false;
       this.emit("aiming", false);
     }
-    this.jar.danger = 1;
-    for (const p of this.planets) p.face.mood = "sleepy";
+    if (reason === "overflow") this.jar.danger = 1;
+    for (const p of this.planets) p.face.mood = reason === "overflow" ? "worried" : "sleepy";
     Sound.play("game_over", 1, -2, 0);
     buzz(160, 0.7);
-    this.addShake(10);
-    const result: RunResult = {
-      mode: this.mode, score: this.score, highest: this.highest, merges: this.merges,
-      drops: this.drops, supernovas: this.supernovas, bestChain: this.bestChain, seconds: this.elapsed,
-    };
-    // Let the moment land before the results appear.
-    void this.tweens.wait(1.1).then(() => this.emit("gameOver", result));
+    this.addShake(reason === "overflow" ? 10 : 3);
+    // Let the moment land before anything else appears.
+    void this.tweens.wait(0.9).then(() => this.emit("fail", reason));
+  }
+
+  /** Whether the one revive for this run is still available. */
+  get canRevive(): boolean {
+    return !this.revived && !this.won;
+  }
+
+  /** Gives up after a fail: reports the final result. */
+  finish(): void {
+    for (const p of this.planets) p.face.mood = "sleepy";
+    this.emit("gameOver", this.resultBase());
+  }
+
+  /** Continues after a fail (paid for with a rewarded ad). */
+  revive(): void {
+    if (!this.isOver || this.won) return;
+    this.revived = true;
+    Save.addStat("revives");
+    if (this.failReason === "drops") {
+      this.dropsLeft += 5;
+      this.emit("dropsLeft", this.dropsLeft);
+      this.fx.text(this.jar.centerX, this.jar.top + 260, "+5 DROPS", "#3fe0c5", 56, 90, 1.4);
+    } else {
+      // Clear the planets crowding the top of the jar.
+      const line = this.jar.lineY();
+      const crowded = [...this.planets].sort((a, b) => a.y - a.radius - (b.y - b.radius));
+      const victims = crowded.filter((p, i) => i < 3 || p.y - p.radius < line + 170);
+      for (const p of victims) {
+        this.fx.burst(p.x, p.y, P.COLORS[p.tier], 26, 380, 1.2);
+        this.fx.shockwave(p.x, p.y, p.radius * 1.8, "rgba(160,220,255,0.9)", 6);
+        this.detach(p);
+        p.face.surprise(1);
+        void this.tweens.to(p, { scale: 0.01, alpha: 0 }, 0.35, ease.inBack).then(() => this.removeGhost(p));
+      }
+      this.fx.text(this.jar.centerX, this.jar.top + 260, "SECOND CHANCE!", "#3fe0c5", 52, 90, 1.4);
+    }
+    Sound.play("powerup", 1, -1, 0);
+    buzz(80, 0.5);
+    this.isOver = false;
+    this.running = true;
+    this.dangerTime = 0;
+    this.dangerSuppress = 2.5;
+    this.jar.danger = 0;
+    for (const p of this.planets) p.face.mood = "normal";
+    this.cooldown = 0.3;
+    this.dropReady = false;
   }
 
   // -------------------------------------------------------------------------
@@ -669,6 +852,7 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.aimingBlackHole = false;
     this.emit("aiming", false);
     this.blackHoles--;
+    Save.addStat("blackHoles");
     this.emit("powerups", this.blackHoles, this.shakes);
     this.swallow(best);
   }
@@ -693,6 +877,7 @@ export class GameWorld extends Emitter<WorldEvents> {
   useShake(): void {
     if (!this.running || this.isOver || this.shakes <= 0) return;
     this.shakes--;
+    Save.addStat("shakes");
     this.emit("powerups", this.blackHoles, this.shakes);
     this.dangerSuppress = 2.5;
     this.dangerTime = 0;

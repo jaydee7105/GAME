@@ -12,6 +12,11 @@ export const NAMES = [
   "Neptune", "Uranus", "Saturn", "Jupiter", "Sun",
 ];
 
+export const PLURALS = [
+  "Asteroids", "Moons", "Mercurys", "Marses", "Venuses", "Earths",
+  "Neptunes", "Uranuses", "Saturns", "Jupiters", "Suns",
+];
+
 export const KEYS = [
   "asteroid", "moon", "mercury", "mars", "venus", "earth",
   "neptune", "uranus", "saturn", "jupiter", "sun",
