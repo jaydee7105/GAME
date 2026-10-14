@@ -395,6 +395,12 @@ func _run_test_hooks() -> void:
 			await _wait(0.5)
 			await _shot(dir, "after")
 			print("[test] resume planets before=%d after=%d score=%d" % [before, world.planet_count(), world.score])
+		"icon":
+			await PromoArt.render(self, PromoArt.icon(), Vector2i(1024, 1024), dir + "/icon_full.png")
+			await PromoArt.render(self, PromoArt.icon(false, true, 0.155), Vector2i(1024, 1024), dir + "/icon_fg.png", true)
+			await PromoArt.render(self, PromoArt.icon(true, false), Vector2i(1024, 1024), dir + "/icon_bg.png")
+		"feature":
+			await PromoArt.render(self, PromoArt.feature(), Vector2i(2048, 1000), dir + "/feature.png")
 		"tutorial":
 			Save.tutorial_done = false
 			start_game("classic")
