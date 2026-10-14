@@ -469,7 +469,7 @@ function chooseGoals(dr: Draft, effort: number, d: number, avoid: string, maxTie
     return pickGoals(dr, dr.pick(opts), effort, d, maxTier);
   }
   if (dr.dust.length) opts.push("dust", "dust", "dust+make");
-  if (dr.marked) opts.push("clear", "clear", "clear+make");
+  if (dr.marked) opts.push("clear", "clear+make", "clear+make");
   if (!opts.length) opts.push("make", "make", "many", "score", "merges", "chain+make", "make+score", "make+merges");
   if (dr.frozen && !dr.marked) opts.push("make", "make");
   if (dr.names.includes("staircase") && !dr.dust.length && !dr.marked) opts.push("chain+make", "chain+make");

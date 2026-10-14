@@ -74,10 +74,10 @@ async function worker(): Promise<void> {
     // Quantile of the bot's drop use to budget for, extra slack, and the win rate to reach.
     const plan = {
       easy: [0.9, 1.35, 0.9],
-      normal: [early ? 0.9 : 0.8, early ? 1.25 : 1.16 - 0.08 * d, early ? 0.85 : 0.72 - 0.12 * d],
-      hard: [0.7, 1.06, 0.5],
-      super: [0.55, 1.0, 0.35],
-      boss: [0.65, 1.06, 0.45],
+      normal: [early ? 0.9 : 0.75, early ? 1.25 : 1.1 - 0.12 * d, early ? 0.85 : 0.7 - 0.15 * d],
+      hard: [0.6, 1.0, 0.5],
+      super: [0.5, 0.95, 0.35],
+      boss: [0.55, 1.0, 0.45],
     }[role as "easy"]!;
     const used: number[] = [];
     let wins = 0;
