@@ -13,7 +13,8 @@ import { Ads } from "./monetization/ads";
 import { BANNER_RESERVE, PACING } from "./monetization/config";
 import type { Assets } from "./render/assets";
 import { SceneRenderer } from "./render/scene";
-import { demoAd, levelComplete, levelFailed, levelMap, reviveOffer } from "./ui/adventure-screens";
+import { demoAd, highlightsButton, highlightsScreen, levelComplete, levelFailed, levelMap, reviveOffer } from "./ui/adventure-screens";
+import { SHOW_HIGHLIGHTS } from "./game/highlights";
 import { awardsScreen, badge } from "./ui/awards";
 import { button, h } from "./ui/dom";
 import { icon } from "./ui/icons";
@@ -246,6 +247,7 @@ export class App {
       settings: () => this.openSettings(),
       planets: () => this.screens.planets(),
       awards: () => awardsScreen(this.screens),
+      highlights: SHOW_HIGHLIGHTS ? highlightsButton(() => highlightsScreen(this.screens, (id) => this.startGame("adventure", id))) : undefined,
     });
     Ads.hideBanner();
   }

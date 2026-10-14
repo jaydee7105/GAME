@@ -4,6 +4,7 @@
 import { Sound } from "../core/audio";
 import { buzz } from "../core/platform";
 import { Mode, Save, SettingKey } from "../core/save";
+import { LEVEL_COUNT } from "../game/chapters";
 import { COUNT, FACTS, NAMES, PLURALS, SATURN, SUN } from "../game/planets";
 import type { RunResult } from "../game/world";
 import { iconUrl } from "../render/sprites";
@@ -74,7 +75,7 @@ export class Screens {
   // -------------------------------------------------------------------------
   // Title
   // -------------------------------------------------------------------------
-  title(h_: { play(): void; resume(): void; daily(): void; adventure(): void; settings(): void; planets(): void; awards(): void }): void {
+  title(h_: { play(): void; resume(): void; daily(): void; adventure(): void; settings(): void; planets(): void; awards(): void; highlights?: HTMLElement }): void {
     const usable = this.viewH - this.safeTop - this.safeBottom;
     const el = h("div", { class: "screen clear title" });
     const orbit = new TitleOrbit();
@@ -91,7 +92,7 @@ export class Screens {
     } else {
       menu.append(button("PLAY", "primary big", h_.play));
     }
-    const lvl = Math.min(Save.data.adventure.unlocked, 100);
+    const lvl = Math.min(Save.data.adventure.unlocked, LEVEL_COUNT);
     menu.append(button(`ADVENTURE<small>Level ${lvl}</small>`, "secondary small stacked", h_.adventure));
     menu.append(button("DAILY CHALLENGE", "teal small", h_.daily));
     const streak = Save.liveStreak();
@@ -109,6 +110,10 @@ export class Screens {
     const footer = h("div", { class: "footer", html: `${icon("trophy")}BEST&nbsp;&nbsp;${formatScore(Save.data.best)}` });
     footer.style.top = `${this.viewH - this.safeBottom - 84}px`;
     el.append(orbit.el, logo, menu, footer);
+    if (h_.highlights) {
+      h_.highlights.style.top = `${this.safeTop + 28}px`;
+      el.append(h_.highlights);
+    }
     this.show(el);
 
     // Place the menu, keeping it clear of the footer on short screens.

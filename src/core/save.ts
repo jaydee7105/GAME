@@ -253,7 +253,8 @@ class SaveStore extends Emitter<{ settings: [] }> {
     const a = this.data.adventure;
     const before = a.stars[level] ?? 0;
     if (stars > before) a.stars[level] = stars;
-    a.unlocked = Math.max(a.unlocked, level + 1);
+    // Only beating your furthest level opens the next one (Highlights can jump ahead).
+    if (level <= a.unlocked) a.unlocked = Math.max(a.unlocked, level + 1);
     this.data.stats.levelsWon++;
     this.save();
     return stars > before;

@@ -209,6 +209,13 @@ export async function runTestScene(app: App, scene: string): Promise<void> {
       }
       break;
     }
+    case "highlights":
+      await wait(1.2);
+      await mark("title");
+      (document.querySelector(".highlights-btn") as HTMLButtonElement).click();
+      await wait(0.8);
+      await mark("highlights");
+      break;
     case "level":
       Save.data.tutorialDone = true;
       app.startGame("adventure", 12);

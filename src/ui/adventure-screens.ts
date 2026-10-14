@@ -5,6 +5,7 @@ import { Sound } from "../core/audio";
 import { buzz } from "../core/platform";
 import { Save } from "../core/save";
 import { MECHANICS } from "../game/chapters";
+import { HIGHLIGHTS, SHOW_HIGHLIGHTS } from "../game/highlights";
 import { CHAPTERS, LEVEL_COUNT, LEVELS_PER_CHAPTER, Level, chapterOf, getLevel, goalIcon, goalText, levelFeatures } from "../game/levels";
 import { NAMES, PLURALS } from "../game/planets";
 import type { FailReason, RunResult } from "../game/world";
@@ -131,8 +132,10 @@ export function levelMap(screens: Screens, onPlay: (level: number) => void): voi
     render(d);
   };
 
+  const top = screens.topbar("Adventure");
+  if (SHOW_HIGHLIGHTS) top.append(highlightsButton(() => highlightsScreen(screens, onPlay)));
   const el = h("div", { class: "screen solid" },
-    screens.topbar("Adventure"),
+    top,
     h("div", { class: "subtitle", html: `${icon("star")}&nbsp;${Save.totalStars()} / ${LEVEL_COUNT * 3}` }),
     header,
     scroll);
@@ -148,6 +151,37 @@ export function levelMap(screens: Screens, onPlay: (level: number) => void): voi
     if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
   });
   render();
+  screens.push(el);
+}
+
+export function highlightsButton(onClick: () => void): HTMLButtonElement {
+  const b = button(`${icon("sparkle")}Highlights`, "gold small highlights-btn", onClick);
+  b.setAttribute("aria-label", "Level highlights");
+  return b;
+}
+
+/** A tour of the most interesting levels, playable right away. */
+export function highlightsScreen(screens: Screens, onPlay: (level: number) => void): void {
+  const list = h("div", { class: "highlights" });
+  for (const hl of HIGHLIGHTS) {
+    const level = getLevel(hl.id);
+    const feats = levelFeatures(level).filter((m) => m !== "basics").slice(0, 4);
+    const card = h("button", { class: `hl-card${level.tag ? " " + level.tag : ""}`, type: "button" },
+      h("div", { class: "hl-num" }, h("small", {}, "LEVEL"), h("b", {}, String(hl.id))),
+      h("div", { class: "hl-info" },
+        h("b", {}, hl.name),
+        h("span", {}, hl.blurb),
+        h("div", { class: "hl-icons" }, ...feats.map((m) => h("i", { title: MECHANICS[m as keyof typeof MECHANICS].name, html: icon(MECHANICS[m as keyof typeof MECHANICS].icon) })),
+          ...level.goals.map((g) => h("em", {}, goalText(g, NAMES, PLURALS))))));
+    card.addEventListener("pointerdown", () => Sound.play("click", 1, -4));
+    card.addEventListener("click", () => levelIntro(screens, level, () => onPlay(hl.id)));
+    list.append(card);
+  }
+  const el = h("div", { class: "screen solid" },
+    screens.topbar("Highlights"),
+    h("div", { class: "subtitle" }, "Jump straight into the best levels"),
+    h("div", { class: "scroll" }, h("div", { class: "col" }, list)));
+  el.style.paddingTop = `${screens.safeTop + 28}px`;
   screens.push(el);
 }
 
