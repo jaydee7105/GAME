@@ -22,3 +22,4 @@ __pycache__/
 tools/out/shard-*.json
 tools/out/*.log
 tools/out/dbg*.ts
+tools/out/changed.json

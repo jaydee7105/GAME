@@ -18,12 +18,12 @@ W, H = 1080, 1920
 SHOTS = [
     ("showcase.png", "Drop & merge", "cute planets"),
     ("showcase_merge.png", "Grow them bigger", "and bigger..."),
-    ("supernova.png", "Make two Suns for a", "SUPERNOVA!"),
+    ("L492.png", "New twists in", "every chapter"),
     ("map.png", "500 levels", "to explore"),
+    ("supernova.png", "Make two Suns for a", "SUPERNOVA!"),
     ("complete.png", "Clear goals,", "earn every star"),
     ("collection.png", "Discover", "every planet"),
     ("title.png", "A new Daily Challenge", "every day"),
-    ("gameover.png", "Beat your", "best score"),
 ]
 
 

@@ -5,7 +5,7 @@ import { buzz, exitApp, initPlatform, isNative } from "./core/platform";
 import { Mode, Save, today } from "./core/save";
 import { PRIVACY_URL, disableReminders, enableReminders, maybeAskForReview, scheduleReminder, shareText } from "./core/social";
 import { MECHANICS } from "./game/chapters";
-import { goalText } from "./game/levels";
+import { getLevel, goalText } from "./game/levels";
 import { COLORS, NAMES, PLURALS } from "./game/planets";
 import { FailReason, GameWorld, RunResult } from "./game/world";
 import { checkAchievements } from "./meta/achievements";
@@ -511,6 +511,6 @@ export class App {
 
   /** Exposed for tests and store-screenshot tooling. */
   debug() {
-    return { app: this, world: this.world, Save, COLORS };
+    return { app: this, world: this.world, Save, COLORS, levels: { getLevel } };
   }
 }

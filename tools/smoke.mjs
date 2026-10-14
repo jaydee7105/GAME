@@ -110,6 +110,34 @@ await page.waitForTimeout(4800);
 const rev = await page.evaluate(() => ({ state: window.planetDrop.app.state, drops: window.planetDrop.world.dropsLeft, can: window.planetDrop.world.canRevive }));
 check(rev.state === "game" && rev.drops > 0 && !rev.can, `revive continues the level (drops left=${rev.drops})`);
 
+// Level mechanics: frozen planets stay put, marked planets count when removed,
+// obstacles exist, and a save/restore keeps all of it.
+const mech = await page.evaluate(async () => {
+  const { app, world: w } = window.planetDrop;
+  const find = (pred) => { for (let id = 21; id <= 500; id++) if (pred(window.planetDrop.levels.getLevel(id))) return id; return 0; };
+  const iceId = find((l) => l.start.some((s) => (s[3] ?? 0) & 6));
+  app.startGame("adventure", iceId);
+  await new Promise((r) => setTimeout(r, 1500));
+  const frozen = w.planets.filter((p) => p.ice);
+  const still = frozen.every((p) => p.body.isStatic());
+  const markId = find((l) => l.goals.some((g) => g.kind === "clear"));
+  app.startGame("adventure", markId);
+  await new Promise((r) => setTimeout(r, 800));
+  const marked = w.planets.find((p) => p.marked && !p.ice);
+  const before = w.cleared;
+  if (marked) { w.toggleBlackHole(); w.pointerDown(marked.x, marked.y); }
+  await new Promise((r) => setTimeout(r, 300));
+  const clearedAfter = w.cleared;
+  const barId = find((l) => (l.bars ?? []).length > 0 && (l.rocks ?? []).length > 0);
+  app.startGame("adventure", barId);
+  const snap = JSON.parse(JSON.stringify(w.snapshot()));
+  w.restore(snap);
+  return { iceId, frozen: frozen.length, still, markId, cleared: clearedAfter, before, marked: !!marked, barId, bars: w.bars.length, rocks: w.rocks.length };
+});
+check(mech.frozen > 0 && mech.still, `frozen planets hang in place (level ${mech.iceId}, ${mech.frozen} frozen)`);
+check(mech.marked && mech.cleared === mech.before + 1, `black-holing a marked planet counts towards its goal (level ${mech.markId})`);
+check(mech.bars > 0 && mech.rocks > 0, `obstacles survive save/restore (level ${mech.barId}: ${mech.bars} bars, ${mech.rocks} rocks)`);
+
 check(errors.length === 0, `no page errors${errors.length ? ":\n  " + errors.join("\n  ") : ""}`);
 await browser.close();
 process.exit(failed ? 1 : 0);

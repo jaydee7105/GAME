@@ -296,9 +296,9 @@ const ICE: LayoutFn[] = [
   },
   (dr, d, strong) => {
     // Two frozen twins: free both, then merge them.
-    const t = dr.int(3, Math.min(4 + Math.floor(d * 2), 5)), y = dr.r(470, 600), f = iceFlag(dr, d, strong);
-    dr.planets.push({ t, x: 110, y, f }, { t, x: W - 110, y: y + dr.r(-50, 50), f });
-    return "frozen-twins";
+    const t = dr.int(3, Math.min(4 + Math.floor(d * 2), 5)), f = iceFlag(dr, d, strong);
+    const a = dr.place(t, f, 40, 240, 330, 640), b = a && dr.place(t, f, 360, 560, 330, 640);
+    return a && b ? "frozen-twins" : null;
   },
   (dr, d, strong) => {
     // A broken shelf of ice across the jar.
@@ -404,7 +404,7 @@ const PILES: Record<string, (dr: Draft, d: number, T: number) => boolean> = {
   // Two big twins far apart: dig a path to bring them together.
   "split-pair": (dr, _d, T) => {
     const t = Math.max(Math.min(T - 1, 5), 3), r = RADII[t];
-    dr.planets.push({ t, x: r + 4, y: H - r - 4, f: 0 }, { t, x: W - r - 4, y: H - r - 4, f: 0 });
+    if (!dr.planet(t, r + 4, H - r - 4, 0) || !dr.planet(t, W - r - 4, H - r - 4, 0)) return false;
     for (let i = 0; i < 3; i++) dr.place(dr.int(0, 2), 0, 160, 440, 600, 740, 40);
     return true;
   },
@@ -704,6 +704,9 @@ for (let id = 1; id <= LEVEL_COUNT; id++) {
 }
 
 fs.writeFileSync(OUT, "[\n" + levels.map((l) => JSON.stringify(l)).join(",\n") + "\n]\n");
+const changed = levels.flatMap((l, i) => (existing[i] && JSON.stringify({ ...existing[i], drops: 0 }) === JSON.stringify({ ...l, drops: 0 }) ? [] : [i + 1]));
+fs.writeFileSync(new URL("./out/changed.json", import.meta.url), JSON.stringify(changed));
+console.log(`${changed.length} levels changed`);
 console.log(`wrote ${levels.length} levels (${stats.retries} retries${stats.failed.length ? `, FAILED: ${stats.failed.join(",")}` : ""})`);
 
 function signature(l: LevelDef): string {

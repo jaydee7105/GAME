@@ -21,12 +21,15 @@ else await master();
 
 async function master(): Promise<void> {
   const levels = JSON.parse(fs.readFileSync(DATA, "utf8"));
-  const from = Number(process.argv[2] ?? 1);
-  const to = Number(process.argv[3] ?? levels.length);
-  const workers = Number(process.argv[4] ?? 4);
+  // "changed" calibrates only the levels levelgen just rebuilt.
+  const onlyChanged = process.argv[2] === "changed";
+  const from = onlyChanged ? 1 : Number(process.argv[2] ?? 1);
+  const to = onlyChanged ? levels.length : Number(process.argv[3] ?? levels.length);
+  const workers = Number(process.argv[onlyChanged ? 3 : 4] ?? 4);
   fs.mkdirSync(OUT_DIR, { recursive: true });
-  const ids: number[] = [];
+  let ids: number[] = [];
   for (let id = from; id <= to; id++) ids.push(id);
+  if (onlyChanged) ids = JSON.parse(fs.readFileSync(new URL("changed.json", OUT_DIR), "utf8"));
   // Spread hard and easy levels evenly between workers.
   const shards = Array.from({ length: workers }, (_, k) => ids.filter((_, i) => i % workers === k));
   const started = Date.now();
