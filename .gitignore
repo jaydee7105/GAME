@@ -23,3 +23,5 @@ tools/out/shard-*.json
 tools/out/*.log
 tools/out/dbg*.ts
 tools/out/changed.json
+tools/out/puzzle-shard-*.json
+tools/out/dump/

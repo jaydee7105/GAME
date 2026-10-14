@@ -138,6 +138,40 @@ check(mech.frozen > 0 && mech.still, `frozen planets hang in place (level ${mech
 check(mech.marked && mech.cleared === mech.before + 1, `black-holing a marked planet counts towards its goal (level ${mech.markId})`);
 check(mech.bars > 0 && mech.rocks > 0, `obstacles survive save/restore (level ${mech.barId}: ${mech.bars} bars, ${mech.rocks} rocks)`);
 
+// Puzzles: the stored solution solves the level in the real game, and a hint
+// snaps a nearby drop onto the marked spot.
+const pz = await page.evaluate(async () => {
+  const { app, world: w, levels } = window.planetDrop;
+  let id = 0;
+  for (let k = 1; k <= 500 && !id; k++) if (levels.getLevel(k).solution) id = k;
+  if (!id) return { id: 0 };
+  const level = levels.getLevel(id);
+  app.startGame("adventure", id);
+  const queueShown = !!document.querySelector(".queue-strip img") || level.queue.length <= 2;
+  const restartShown = getComputedStyle([...document.querySelectorAll(".hud .pill")].find((b) => b.textContent.includes("Restart"))).display !== "none";
+  const until = async (pred, ms = 8000) => { const t = performance.now(); while (!pred() && performance.now() - t < ms) await new Promise((r) => setTimeout(r, 30)); };
+  for (const fx of level.solution) {
+    await until(() => w.dropReady || w.isOver);
+    if (w.isOver) break;
+    w.dropTargetX = w.jar.left + fx * w.jar.rect.w;
+    w.drop();
+  }
+  await until(() => w.isOver, 10000);
+  const solved = w.hasWon;
+  app.startGame("adventure", id, true);
+  await until(() => w.dropReady);
+  const target = w.guideX();
+  w.dropTargetX = target + 15;
+  w.drop();
+  const snapped = Math.abs(w.dropX - target) < 0.5;
+  return { id, solved, queueShown, restartShown, snapped, steps: level.solution.length };
+});
+if (pz.id) {
+  check(pz.solved, `puzzle ${pz.id} is solved by its stored solution (${pz.steps} drops)`);
+  check(pz.queueShown && pz.restartShown, "puzzle HUD shows the drop order and a Restart button");
+  check(pz.snapped, "a hinted drop snaps onto the marked spot");
+}
+
 check(errors.length === 0, `no page errors${errors.length ? ":\n  " + errors.join("\n  ") : ""}`);
 await browser.close();
 process.exit(failed ? 1 : 0);

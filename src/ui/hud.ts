@@ -30,11 +30,14 @@ export class Hud {
   private goalsEl: HTMLDivElement;
   private dropsEl: HTMLDivElement;
   private dropsNum: HTMLElement;
+  private queueEl: HTMLDivElement;
+  private restartBtn: HTMLButtonElement;
+  private hintBtn: HTMLButtonElement;
   private shown = 0;
   private target = 0;
   private highest = -1;
 
-  constructor(private world: GameWorld, handlers: { pause(): void; blackHole(): void; shake(): void }) {
+  constructor(private world: GameWorld, handlers: { pause(): void; blackHole(): void; shake(): void; restart(): void; hint(): void }) {
     this.scoreEl = h("div", { class: "score outlined" }, "0");
     this.bestEl = h("div", { class: "best" }, "BEST 0");
     this.modeEl = h("div", { class: "mode" });
@@ -65,7 +68,13 @@ export class Hud {
     this.goalsEl = h("div", { class: "goals" });
     this.dropsNum = h("b", {}, "0");
     this.dropsEl = h("div", { class: "drops" }, this.dropsNum, h("span", {}, "DROPS"));
-    this.el = h("div", { class: "hud" }, this.scoreWrap, this.goalsEl, this.dropsEl, this.next, this.pause, this.strip, this.bh, this.sh, this.finger, this.hint);
+    // Puzzle levels: the planets after the next one, and restart/hint in place of power-ups.
+    this.queueEl = h("div", { class: "queue-strip" });
+    this.restartBtn = button(`${icon("retry")}Restart`, "secondary pill", handlers.restart);
+    this.hintBtn = button(`${icon("sparkle")}Hint`, "teal pill hint-btn", handlers.hint);
+    this.hintBtn.append(h("span", { class: "badge ad", html: icon("play") }));
+    this.el = h("div", { class: "hud" }, this.scoreWrap, this.goalsEl, this.dropsEl, this.next, this.queueEl, this.pause, this.strip,
+      this.bh, this.sh, this.restartBtn, this.hintBtn, this.finger, this.hint);
     world.on("goals", (progress) => this.renderGoals(progress));
     world.on("dropsLeft", (n) => {
       this.dropsNum.textContent = String(Math.max(n, 0));
@@ -76,7 +85,9 @@ export class Hud {
     world.on("score", (score, gained) => this.onScore(score, gained));
     world.on("next", (t) => {
       this.next.classList.toggle("clouded", world.hidden);
-      if (world.hidden) return;
+      this.renderQueue();
+      this.next.classList.toggle("empty", t < 0);
+      if (world.hidden || t < 0) return;
       this.nextImg.src = iconUrl(t, { face: Save.setting("faces") });
       this.nextImg.classList.remove("pop");
       void this.nextImg.offsetWidth;
@@ -110,6 +121,10 @@ export class Hud {
     const barY = j.bottom + 100, gap = 20, w = (right - left - gap) / 2;
     place(this.bh, left, barY, w);
     place(this.sh, left + w + gap, barY, w);
+    place(this.restartBtn, left, barY, w);
+    place(this.hintBtn, left + w + gap, barY, w);
+    this.queueEl.style.right = `${720 - right}px`;
+    this.queueEl.style.top = `${top + 110}px`;
     place(this.hint, j.centerX, j.top + 150);
     this.hint.style.width = `${j.rect.w - 80}px`;
     place(this.finger, j.centerX, this.world.dropY + 96);
@@ -119,6 +134,12 @@ export class Hud {
     const w = this.world;
     this.modeEl.textContent = w.mode === "daily" ? "DAILY CHALLENGE" : w.level ? `LEVEL ${w.level.id}` : "";
     const adventure = Boolean(w.level);
+    const puzzle = Boolean(w.queue);
+    this.bh.style.display = this.sh.style.display = puzzle ? "none" : "";
+    this.restartBtn.style.display = this.hintBtn.style.display = this.queueEl.style.display = puzzle ? "" : "none";
+    this.hintBtn.classList.toggle("on", Boolean(w.guide));
+    this.hintBtn.disabled = Boolean(w.guide);
+    if (puzzle) this.renderQueue();
     this.goalsEl.style.display = adventure ? "" : "none";
     this.dropsEl.style.display = adventure ? "" : "none";
     this.bestEl.style.display = adventure ? "none" : "";
@@ -132,6 +153,18 @@ export class Hud {
     this.highest = -1;
     this.refreshStrip();
     this.hideHint();
+  }
+
+  /** Puzzle levels: the planets still to come after the next one. */
+  private renderQueue(): void {
+    const w = this.world;
+    if (!w.queue) return;
+    const rest = w.queue.slice(w.queueIndex, w.queueIndex + 5);
+    const more = w.queue.length - w.queueIndex - rest.length;
+    this.queueEl.replaceChildren(
+      ...(rest.length ? [h("span", {}, "THEN")] : []),
+      ...rest.map((t) => h("img", { src: iconUrl(t, { face: false }), alt: "" })),
+      ...(more > 0 ? [h("b", {}, `+${more}`)] : []));
   }
 
   private renderGoals(progress: number[]): void {

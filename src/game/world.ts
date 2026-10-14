@@ -147,6 +147,12 @@ export class GameWorld extends Emitter<WorldEvents> {
   hidden = false;
   cleared = 0;
   dustTaken = 0;
+  /** Puzzle levels: the fixed drop order, how far through it we are, and a hint's drop spots. */
+  queue: number[] | null = null;
+  queueIndex = 0;
+  guide: number[] | null = null;
+  private calm = 0;
+  private sinceDrop = 0;
   private gravityScale = 1;
   private bounce = 0.12;
   private friction = 0.45;
@@ -311,14 +317,17 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.mode = mode;
     this.level = mode === "adventure" ? (typeof levelRef === "number" ? getLevel(levelRef) : levelRef) : null;
     this.applyLevel(this.level);
+    this.queue = this.level?.queue ?? null;
+    this.queueIndex = 0;
+    this.guide = null;
     this.rng = new Rng(mode === "daily" ? dailySeed() : undefined);
     this.revived = false;
     this.won = false;
-    this.dropsLeft = this.level?.drops ?? 0;
+    this.dropsLeft = this.queue ? this.queue.length : this.level?.drops ?? 0;
     this.goalProgress = this.level ? this.level.goals.map(() => 0) : [];
     this.score = 0;
-    this.blackHoles = 1;
-    this.shakes = 1;
+    // Power-ups would sidestep a puzzle's design.
+    this.blackHoles = this.shakes = this.queue ? 0 : 1;
     this.highest = 0;
     this.merges = 0;
     this.drops = 0;
@@ -340,7 +349,7 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.begin();
   }
 
-  restore(s: Snapshot): boolean {
+  restore(s: Snapshot, levelOverride?: Level): boolean {
     if (!s || !Array.isArray(s.planets)) return false;
     this.clear();
     this.mode = s.mode;
@@ -357,8 +366,11 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.elapsed = s.elapsed;
     this.rng = new Rng();
     this.rng.state = s.rng >>> 0;
-    this.level = s.mode === "adventure" && s.level ? getLevel(s.level) : null;
+    this.level = s.mode === "adventure" && s.level ? levelOverride ?? getLevel(s.level) : null;
     this.applyLevel(this.level);
+    this.queue = this.level?.queue ?? null;
+    this.queueIndex = s.drops + 2;
+    this.guide = null;
     this.revived = Boolean(s.revived);
     this.won = false;
     this.dropsLeft = s.dropsLeft ?? this.level?.drops ?? 0;
@@ -442,6 +454,7 @@ export class GameWorld extends Emitter<WorldEvents> {
   }
 
   private roll(opening = false): number {
+    if (this.queue) return this.queue[this.queueIndex++] ?? -1;
     // The first drops are always small so every run starts gently.
     const max = this.level ? this.level.maxDrop + 1 : P.DROPPABLE;
     const limit = Math.min(opening ? 3 : P.DROPPABLE, max);
@@ -522,18 +535,24 @@ export class GameWorld extends Emitter<WorldEvents> {
   drop(): void {
     if (!this.running || this.isOver || !this.dropReady || this.cooldown > 0) return;
     // Drop exactly where the finger is (inside the jar), not where smoothing has reached.
-    this.dropX = this.dropTargetX = this.clampDrop(this.dropTargetX);
+    let x = this.clampDrop(this.dropTargetX);
+    // With a hint showing, a drop close to the marked spot snaps onto it.
+    const hint = this.guideX();
+    if (hint !== null && Math.abs(x - hint) < 28) x = hint;
+    this.dropX = this.dropTargetX = x;
     const tier = this.currentTier;
     const p = this.spawn(tier, this.dropX, this.dropY);
     p.body!.setLinearVelocity(Vec2(0, 80 / PPM));
-    p.body!.setAngularVelocity(this.rng.range(-0.6, 0.6));
+    p.body!.setAngularVelocity(this.queue ? 0 : this.rng.range(-0.6, 0.6));
+    this.sinceDrop = 0;
+    this.calm = 0;
     this.drops++;
     Save.addStat("drops");
     if (this.level) {
       this.dropsLeft--;
       this.emit("dropsLeft", this.dropsLeft);
       // Out of drops: let the jar settle, then see whether the goals were met.
-      if (this.dropsLeft <= 0) this.settleTimer = 2.4;
+      if (this.dropsLeft <= 0) this.settleTimer = this.queue ? 3 : 2.4;
     }
     if (Save.markSeen(tier)) this.emit("seen", tier);
     if (this.drops === 1) this.emit("firstDrop");
@@ -614,7 +633,7 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.elapsed += dt;
     if (this.cooldown > 0) {
       this.cooldown -= dt;
-      if (this.cooldown <= 0 && !this.dropReady) this.readyDropper();
+      if (this.cooldown <= 0 && !this.dropReady && !this.queue) this.readyDropper();
     }
     if (this.autoplay) {
       this.autoTimer -= dt;
@@ -633,11 +652,38 @@ export class GameWorld extends Emitter<WorldEvents> {
     }
     this.syncBodies();
 
+    // Puzzles: the next planet is handed over once the jar has come to rest,
+    // so where you drop is all that matters, not when.
+    if (this.queue && !this.dropReady && this.cooldown <= 0 && !this.isOver && this.dropsLeft > 0) {
+      this.sinceDrop += dt;
+      this.calm = this.isCalm() ? this.calm + dt : 0;
+      if (this.calm > 0.15 || this.sinceDrop > 4.5) this.readyDropper();
+    }
+
     // Adventure: out of drops - wait for the jar to settle, then judge.
     if (this.settleTimer > 0 && !this.isOver) {
       this.settleTimer -= dt;
       if (this.settleTimer <= 0 && !this.won) this.end("drops");
     }
+  }
+
+  private isCalm(): boolean {
+    for (const p of this.planets) {
+      if (!p.body || p.ice) continue;
+      const v = p.body.getLinearVelocity();
+      if (Math.hypot(v.x, v.y) * PPM > 10 || Math.abs(p.body.getAngularVelocity()) > 0.6) return false;
+    }
+    return true;
+  }
+
+  /** The hinted drop spot for the next planet, if a hint is showing. */
+  guideX(): number | null {
+    const f = this.guide?.[this.drops];
+    return f === undefined ? null : this.jar.left + f * this.jar.rect.w;
+  }
+
+  get hasWon(): boolean {
+    return this.won;
   }
 
   private physicsStep(): void {
@@ -886,7 +932,7 @@ export class GameWorld extends Emitter<WorldEvents> {
       this.emit("aiming", false);
     }
     for (const p of this.planets) p.face.cheer(10);
-    const stars = starsFor(this.level, this.dropsLeft);
+    const stars = starsFor(this.level, this.dropsLeft, Boolean(this.guide));
     this.fx.text(this.jar.centerX, this.jar.top + 220, "LEVEL COMPLETE!", "#ffd34d", 60, 90, 1.8);
     for (let i = 0; i < 5; i++) {
       void this.tweens.wait(i * 0.12).then(() => {
@@ -961,7 +1007,7 @@ export class GameWorld extends Emitter<WorldEvents> {
 
   /** Whether the one revive for this run is still available. */
   get canRevive(): boolean {
-    return !this.revived && !this.won;
+    return !this.revived && !this.won && !this.queue;
   }
 
   /** Gives up after a fail: reports the final result. */
@@ -1083,9 +1129,9 @@ export class GameWorld extends Emitter<WorldEvents> {
   // Aim guide and screen shake
   // -------------------------------------------------------------------------
   /** Where the held planet would come to rest if dropped straight down. */
-  landingY(): number {
+  landingY(at = this.dropX): number {
     const r = P.collisionRadius(this.currentTier);
-    const x = this.dropX;
+    const x = at;
     let y = this.jar.floorFor(x, r);
     for (const p of this.planets) {
       const rr = r + p.bodyRadius;

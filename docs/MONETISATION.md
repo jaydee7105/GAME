@@ -36,6 +36,7 @@ place, `src/monetization/config.ts`:
 | Banner (adaptive, bottom) | During play | From the 2nd run on; hidden on menus; the jar and HUD are laid out above it |
 | Interstitial | After a run or level, before the next screen | Not in the first 3 runs; then at most every 2nd finished run and at least 100 s apart |
 | Rewarded "Keep going?" | Jar overflow or out of drops | Once per run; overflow clears the top of the jar, out-of-drops gives +5 drops; 6 s countdown, "No thanks" always available |
+| Rewarded "Hint" | Puzzle levels, any time or after failing | Shows where to drop every planet for the rest of your attempts at that puzzle; a hinted solve earns 1 star instead of 3 |
 
 Other pieces of the model:
 

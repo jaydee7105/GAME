@@ -28,8 +28,8 @@ async function master(): Promise<void> {
   const workers = Number(process.argv[onlyChanged ? 3 : 4] ?? 4);
   fs.mkdirSync(OUT_DIR, { recursive: true });
   let ids: number[] = [];
-  for (let id = from; id <= to; id++) ids.push(id);
-  if (onlyChanged) ids = JSON.parse(fs.readFileSync(new URL("changed.json", OUT_DIR), "utf8"));
+  for (let id = from; id <= to; id++) if (!levels[id - 1].queue) ids.push(id); // puzzles have fixed drops
+  if (onlyChanged) ids = (JSON.parse(fs.readFileSync(new URL("changed.json", OUT_DIR), "utf8")) as number[]).filter((id) => !levels[id - 1].queue);
   // Spread hard and easy levels evenly between workers.
   const shards = Array.from({ length: workers }, (_, k) => ids.filter((_, i) => i % workers === k));
   const started = Date.now();

@@ -43,6 +43,8 @@ export class App {
   private last = performance.now();
   private autosave = 0;
   private tutorialStep = -1;
+  /** Puzzle the player bought a hint for (it stays on for retries). */
+  private hintedLevel = 0;
   private warned = false;
   private pointerId: number | null = null;
 
@@ -58,6 +60,8 @@ export class App {
       pause: () => this.pauseGame(),
       blackHole: () => w.toggleBlackHole(),
       shake: () => w.useShake(),
+      restart: () => this.restartPuzzle(),
+      hint: () => this.offerHint(),
     });
     this.flash = h("div", { class: "flash" });
     const screenHost = h("div", { class: "screens" });
@@ -268,12 +272,17 @@ export class App {
     levelMap(this.screens, (id) => this.startGame("adventure", id));
   }
 
-  startGame(mode: Mode, level = 1): void {
+  startGame(mode: Mode, level = 1, guided = false): void {
     Save.setSnapshot(null);
     this.screens.closeAll();
     this.state = "game";
     this.hud.setVisible(true);
     this.world.start(mode, level);
+    // A bought hint lasts for the rest of your attempts at that puzzle.
+    if (this.world.level?.solution && (guided || this.hintedLevel === level)) {
+      this.world.guide = this.world.level.solution;
+      this.hintedLevel = level;
+    }
     this.hud.startRun();
     this.beginTutorial();
     if (this.world.level && this.tutorialStep < 0) {
@@ -389,6 +398,35 @@ export class App {
     });
   }
 
+  /** Puzzle levels: start the same puzzle again straight away. */
+  private restartPuzzle(): void {
+    const id = this.world.level?.id;
+    if (!id || this.state !== "game") return;
+    Sound.play("click", 0.9, -4);
+    this.startGame("adventure", id);
+  }
+
+  /** Puzzle levels: watch a video to see where every planet goes. */
+  private offerHint(): void {
+    const level = this.world.level;
+    if (!level?.solution || this.world.guide || this.state !== "game") return;
+    this.state = "paused";
+    const panel = h("div", { class: "panel" },
+      h("h2", {}, "Need a hint?"),
+      h("div", { class: "msg" }, "Watch a short video to see where to drop every planet. The puzzle starts again with the hints showing."),
+      button(`${icon("play")}Watch video`, "teal block", async () => {
+        this.screens.pop();
+        if (await Ads.showRewarded()) this.startGame("adventure", level.id, true);
+        else this.state = "game";
+      }),
+      button("NO THANKS", "ghost block small", () => {
+        this.screens.pop();
+        this.state = "game";
+        this.last = performance.now();
+      }));
+    this.screens.push(h("div", { class: "screen" }, panel));
+  }
+
   private onGameOver(r: RunResult): void {
     this.state = "over";
     Save.setSnapshot(null);
@@ -396,8 +434,12 @@ export class App {
     this.endTutorial();
     const newBest = Save.recordGame(r.mode, r.score, r.seconds);
     if (r.mode === "adventure") {
+      const puzzle = Boolean(this.world.level?.solution);
       levelFailed(this.screens, r, [...this.world.goalProgress], {
-        retry: () => this.afterRun(() => this.startGame("adventure", r.level)),
+        hint: puzzle && !this.world.guide ? async () => {
+          if (await Ads.showRewarded()) this.startGame("adventure", r.level!, true);
+        } : undefined,
+        retry: () => (puzzle ? this.startGame("adventure", r.level) : this.afterRun(() => this.startGame("adventure", r.level))),
         map: () => this.afterRun(() => {
           this.goHome(false);
           this.openMap();

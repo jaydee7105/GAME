@@ -61,6 +61,12 @@ export interface Level {
   intro?: Mechanic;
   /** Layout name (for tools and debugging). */
   layout?: string;
+  /** Puzzle levels: the exact planets you get, in order (shown in advance). */
+  queue?: number[];
+  /** Puzzle levels: a known solution, drop x per planet as a fraction of the jar. */
+  solution?: number[];
+  /** Puzzle levels: the name of the idea ("Over the Wall"...). */
+  title?: string;
 }
 
 export type LevelDef = Omit<Level, "id" | "chapter">;
@@ -78,8 +84,9 @@ export function getLevel(id: number): Level {
   return l;
 }
 
-/** Stars earned for finishing with this many drops left. */
-export function starsFor(level: Pick<Level, "drops">, dropsLeft: number): number {
+/** Stars earned for finishing with this many drops left (puzzles: 3 unless a hint was used). */
+export function starsFor(level: Pick<Level, "drops" | "queue">, dropsLeft: number, hinted = false): number {
+  if (level.queue) return hinted ? 1 : 3;
   const f = dropsLeft / level.drops;
   return f >= 0.3 ? 3 : f >= 0.12 ? 2 : 1;
 }

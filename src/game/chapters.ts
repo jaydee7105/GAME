@@ -6,7 +6,7 @@ export const LEVEL_COUNT = 500;
 export const LEVELS_PER_CHAPTER = 20;
 
 export type Mechanic =
-  | "basics" | "lowgrav" | "rocks" | "dust" | "hidden" | "ice" | "shelves" | "clear"
+  | "basics" | "puzzle" | "lowgrav" | "rocks" | "dust" | "hidden" | "ice" | "shelves" | "clear"
   | "bouncy" | "slippery" | "wind" | "spinners" | "wells" | "heavy" | "ceiling" | "narrow";
 
 export interface MechanicInfo {
@@ -17,6 +17,7 @@ export interface MechanicInfo {
 }
 
 export const MECHANICS: Record<Exclude<Mechanic, "basics">, MechanicInfo> = {
+  puzzle: { name: "Puzzle levels", desc: "You can see every planet you'll get, in order. Work out where each one goes!", icon: "puzzle" },
   lowgrav: { name: "Low gravity", desc: "Planets drift down slowly and bounce around more. Take your time.", icon: "feather" },
   rocks: { name: "Space rocks", desc: "Rocks are stuck in the jar. Planets bounce off them and pile up on top.", icon: "rock" },
   dust: { name: "Stardust", desc: "Merge planets on top of the stardust to collect it.", icon: "sparkle" },
@@ -71,6 +72,18 @@ export const CHAPTERS: Chapter[] = [
   { name: "Event Horizon", icon: 9, mechanic: "basics", mix: ["wells", "slippery", "ceiling", "clear"] },
   { name: "Solar Core", icon: 10, mechanic: "basics", mix: ["wind", "spinners", "ice", "dust", "wells", "rocks"] },
 ];
+
+/**
+ * About half the levels are puzzles: a fixed drop order you can see, and a
+ * set-up with a known solution. Chapter intros stay regular levels.
+ */
+export function isPuzzleSlot(id: number): boolean {
+  const c = chapterOf(id), i = (id - 1) % LEVELS_PER_CHAPTER;
+  if (c === 0) return i >= 5 && i % 2 === 1 && i < 19;
+  if (i === 0) return false;
+  if (i === LEVELS_PER_CHAPTER - 1) return c % 2 === 1;
+  return i % 2 === 1 || (c >= 9 && i === 10);
+}
 
 export function chapterOf(levelId: number): number {
   return Math.min(Math.floor((levelId - 1) / LEVELS_PER_CHAPTER), CHAPTERS.length - 1);

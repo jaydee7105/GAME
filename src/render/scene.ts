@@ -108,6 +108,7 @@ export class SceneRenderer {
       const y = w.dropY + Math.sin(this.time * 2.4) * 2;
       const a = Math.sin(this.time * 1.3) * 0.06;
       if (w.showGuide) this.drawGuide(f, w);
+      this.drawHint(f, w);
       this.drawGlow(b, t, w.dropX, y, r, 1);
       this.drawPlanet(t, w.dropX, y, r, a, 0, 1);
       if (faces) this.drawPlanetFace(f, t, w.dropX, y, r, a, w.dropFace.current, w.dropFace.blinking);
@@ -184,6 +185,36 @@ export class SceneRenderer {
     g.translate(x, y);
     g.rotate(angle);
     drawFace(g, r * (tier === 0 ? 0.85 : 1), mood, blinking);
+    g.restore();
+  }
+
+  /** Puzzle hint: where the solution drops the next planet. */
+  private drawHint(g: CanvasRenderingContext2D, w: GameWorld): void {
+    const x = w.guideX();
+    if (x === null) return;
+    const r = RADII[w.currentTier];
+    const land = w.landingY(x);
+    const pulse = 0.5 + 0.5 * Math.sin(this.time * 5);
+    g.save();
+    g.strokeStyle = `rgba(63,224,197,${0.5 + 0.4 * pulse})`;
+    g.lineWidth = 4;
+    g.setLineDash([10, 10]);
+    g.lineDashOffset = -this.time * 40;
+    g.beginPath();
+    g.moveTo(x, w.dropY + r + 12);
+    g.lineTo(x, land);
+    g.stroke();
+    g.setLineDash([]);
+    g.lineWidth = 5;
+    g.beginPath();
+    g.arc(x, land, collisionRadius(w.currentTier) + 4 + pulse * 4, 0, Math.PI * 2);
+    g.stroke();
+    g.fillStyle = `rgba(63,224,197,${0.15 + 0.1 * pulse})`;
+    g.fill();
+    // A ring around the dropper spot.
+    g.beginPath();
+    g.arc(x, w.dropY, r + 10 + pulse * 5, 0, Math.PI * 2);
+    g.stroke();
     g.restore();
   }
 

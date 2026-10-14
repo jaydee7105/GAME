@@ -96,7 +96,7 @@ export function levelMap(screens: Screens, onPlay: (level: number) => void): voi
       const isLocked = id > unlocked;
       const isCurrent = id === unlocked;
       const node = h("button", {
-        class: `node${isLocked ? " locked" : ""}${isCurrent ? " current" : ""}${level.tag ? " " + level.tag : ""}`,
+        class: `node${isLocked ? " locked" : ""}${isCurrent ? " current" : ""}${level.tag ? " " + level.tag : ""}${level.queue ? " puzzle" : ""}`,
         type: "button",
         style: { marginLeft: `${Math.round(Math.sin(i * 0.9) * 150)}px` },
         "aria-label": `Level ${id}`,
@@ -104,7 +104,8 @@ export function levelMap(screens: Screens, onPlay: (level: number) => void): voi
       h("span", {}, String(id)),
       stars ? starRow(stars, "tiny") : null,
       level.tag && !isLocked ? h("i", { class: "tag" }, level.tag === "boss" ? "BOSS" : level.tag === "super" ? "SUPER" : "HARD") : null,
-      level.intro && !isLocked ? h("i", { class: "new", html: icon(MECHANICS[level.intro as keyof typeof MECHANICS]?.icon ?? "star") }) : null);
+      level.intro && !isLocked ? h("i", { class: "new", html: icon(MECHANICS[level.intro as keyof typeof MECHANICS]?.icon ?? "star") }) : null,
+      level.queue && !level.intro ? h("i", { class: "pz", html: icon("puzzle") }) : null);
       node.addEventListener("pointerdown", () => Sound.play("click", 1, -4));
       node.addEventListener("click", () => {
         if (isLocked) {
@@ -193,16 +194,22 @@ export function levelIntro(screens: Screens, level: Level, onStart: () => void):
     const info = MECHANICS[m as keyof typeof MECHANICS];
     return h("span", { class: "chip", html: `${icon(info.icon)}${info.name}` });
   });
-  const panel = h("div", { class: `panel level-panel${level.tag ? " " + level.tag : ""}` },
-    h("div", { class: "eyebrow" }, `${chapter.name.toUpperCase()}${level.tag ? ` · ${TAGS[level.tag]}` : ""}`),
+  const puzzle = Boolean(level.queue);
+  const panel = h("div", { class: `panel level-panel${level.tag ? " " + level.tag : ""}${puzzle ? " puzzle" : ""}` },
+    h("div", { class: "eyebrow" }, `${puzzle ? "PUZZLE" : chapter.name.toUpperCase()}${level.tag ? ` · ${TAGS[level.tag]}` : ""}`),
     h("h2", {}, `Level ${level.id}`),
+    puzzle && level.title ? h("div", { class: "pz-title", html: `${icon("puzzle")}${level.title}` }) : null,
     best ? starRow(best) : null,
     intro ? h("div", { class: "new-card" },
       h("i", { html: icon(intro.icon) }),
       h("div", {}, h("small", {}, "NEW!"), h("b", {}, intro.name), h("span", {}, intro.desc))) : null,
     goalList(level),
     chips.length ? h("div", { class: "chips" }, ...chips) : null,
-    h("div", { class: "msg" }, `${level.drops} drops · Finish with drops to spare for more stars`),
+    puzzle ? h("div", { class: "pz-queue" }, h("small", {}, "YOUR PLANETS, IN ORDER"),
+      h("div", {}, ...level.queue!.map((t) => h("img", { src: iconUrl(t, { face: Save.setting("faces") }), alt: "" })))) : null,
+    h("div", { class: "msg" }, puzzle
+      ? "Every puzzle has a solution. Plan where each planet goes!"
+      : `${level.drops} drops · Finish with drops to spare for more stars`),
     button("PLAY", "primary block", () => {
       screens.closeAll();
       onStart();
@@ -219,20 +226,26 @@ export function levelComplete(screens: Screens, r: RunResult, h_: { next(): void
     h("div", { class: "eyebrow" }, CHAPTERS[level.chapter].name.toUpperCase()),
     h("h2", {}, `Level ${level.id} complete!`),
     starRow(r.stars ?? 1, "big", true),
-    h("div", { class: "msg" }, `${r.dropsLeft} drops to spare · Score ${formatScore(r.score)}`),
+    h("div", { class: "msg" }, level.queue
+      ? (r.stars ?? 3) < 3 ? "Solved with a hint. Try it without one for 3 stars!" : `Solved in ${r.drops} ${r.drops === 1 ? "drop" : "drops"}!`
+      : `${r.dropsLeft} drops to spare · Score ${formatScore(r.score)}`),
     last ? h("div", { class: "msg", style: { color: "var(--gold)" } }, "You finished every level. Amazing!") : null,
     last ? null : button(`NEXT: LEVEL ${level.id + 1}`, "primary block", h_.next),
     button("MAP", "ghost block small", h_.map));
   screens.show(h("div", { class: "screen" }, panel));
 }
 
-export function levelFailed(screens: Screens, r: RunResult, progress: number[], h_: { retry(): void; map(): void }): void {
+export function levelFailed(screens: Screens, r: RunResult, progress: number[], h_: { retry(): void; map(): void; hint?: () => void }): void {
   const level = getLevel(r.level!);
+  const puzzle = Boolean(level.queue);
   const panel = h("div", { class: "panel result" },
-    h("h2", {}, r.reason === "drops" ? "Out of drops!" : "Jar's full!"),
-    h("div", { class: "msg" }, `Level ${level.id} · So close! Here's how far you got:`),
+    h("h2", {}, puzzle ? "Not quite!" : r.reason === "drops" ? "Out of drops!" : "Jar's full!"),
+    h("div", { class: "msg" }, puzzle
+      ? `${level.title ?? `Level ${level.id}`} · There's always a way. Try a different plan!`
+      : `Level ${level.id} · So close! Here's how far you got:`),
     goalList(level, progress),
     button("TRY AGAIN", "primary block", h_.retry),
+    h_.hint ? button(`${icon("play")}Show me how`, "teal block small", h_.hint) : null,
     button("MAP", "ghost block small", h_.map));
   screens.show(h("div", { class: "screen" }, panel));
 }
