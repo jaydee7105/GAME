@@ -2,7 +2,7 @@
 
 import { Save } from "../core/save";
 import { COUNT } from "../game/planets";
-import { goalText } from "../game/levels";
+import { goalIcon, goalText } from "../game/levels";
 import { NAMES, PLURALS } from "../game/planets";
 import type { GameWorld } from "../game/world";
 import { iconUrl } from "../render/sprites";
@@ -40,7 +40,7 @@ export class Hud {
     this.modeEl = h("div", { class: "mode" });
     this.scoreWrap = h("div", { class: "score-wrap" }, this.scoreEl, this.bestEl, this.modeEl);
     this.nextImg = h("img", { alt: "" });
-    this.next = h("div", { class: "next" }, h("span", {}, "NEXT"), this.nextImg);
+    this.next = h("div", { class: "next" }, h("span", {}, "NEXT"), this.nextImg, h("i", { class: "cloud", html: icon("cloud") }));
     this.pause = button(icon("pause"), "ghost round", handlers.pause);
     this.pause.setAttribute("aria-label", "Pause");
     this.bhBadge = h("span", { class: "badge" }, "1");
@@ -75,6 +75,8 @@ export class Hud {
 
     world.on("score", (score, gained) => this.onScore(score, gained));
     world.on("next", (t) => {
+      this.next.classList.toggle("clouded", world.hidden);
+      if (world.hidden) return;
       this.nextImg.src = iconUrl(t, { face: Save.setting("faces") });
       this.nextImg.classList.remove("pop");
       void this.nextImg.offsetWidth;
@@ -140,7 +142,7 @@ export class Hud {
       const done = p >= g.count;
       const iconEl = g.kind === "make"
         ? h("img", { src: iconUrl(g.tier!, { face: false }), alt: "" })
-        : h("i", { html: icon(g.kind === "score" ? "star" : "planet") });
+        : h("i", { class: `gi-${g.kind}`, html: icon(goalIcon(g)) });
       const label = g.kind === "score" ? `${formatScore(p)} / ${formatScore(g.count)}` : `${p} / ${g.count}`;
       return h("div", { class: `goal${done ? " done" : ""}`, title: goalText(g, NAMES, PLURALS) }, iconEl, h("span", {}, done ? "✓" : label));
     }));

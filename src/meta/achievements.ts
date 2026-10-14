@@ -35,8 +35,12 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "streak7", name: "Weekly Ritual", desc: "Play the Daily Challenge 7 days in a row", badge: "flame", progress: () => [Math.min(Save.liveStreak(), 7), 7] },
   { id: "level10", name: "Belt Graduate", desc: "Clear Adventure level 10", badge: 0, progress: () => [Math.min(Save.data.adventure.unlocked - 1, 10), 10] },
   { id: "level50", name: "Halfway Home", desc: "Clear Adventure level 50", badge: 7, progress: () => [Math.min(Save.data.adventure.unlocked - 1, 50), 50] },
-  { id: "level100", name: "Master of the Cosmos", desc: "Clear all 100 Adventure levels", badge: 10, progress: () => [Math.min(Save.data.adventure.unlocked - 1, 100), 100] },
+  { id: "level100", name: "Centurion", desc: "Clear Adventure level 100", badge: 8, progress: () => [Math.min(Save.data.adventure.unlocked - 1, 100), 100] },
+  { id: "level250", name: "Deep Space", desc: "Clear Adventure level 250", badge: 9, progress: () => [Math.min(Save.data.adventure.unlocked - 1, 250), 250] },
+  { id: "level500", name: "Master of the Cosmos", desc: "Clear all 500 Adventure levels", badge: 10, progress: () => [Math.min(Save.data.adventure.unlocked - 1, 500), 500] },
   { id: "stars100", name: "Star Collector", desc: "Earn 100 Adventure stars", badge: "star", progress: () => [Math.min(Save.totalStars(), 100), 100] },
+  { id: "stars500", name: "Constellation", desc: "Earn 500 Adventure stars", badge: "sparkle", progress: () => [Math.min(Save.totalStars(), 500), 500] },
+  { id: "stars1500", name: "Perfect Universe", desc: "Earn all 1,500 Adventure stars", badge: "star", progress: () => [Math.min(Save.totalStars(), 1500), 1500] },
   { id: "blackhole10", name: "Event Horizon", desc: "Use 10 Black Holes", badge: "blackhole", progress: () => [Math.min(s().blackHoles, 10), 10] },
   { id: "collector", name: "Complete Set", desc: "Discover every planet", badge: 10, progress: () => [Save.discoveredCount(), COUNT] },
 ];

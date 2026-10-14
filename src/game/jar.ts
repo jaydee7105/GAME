@@ -13,6 +13,8 @@ export class Jar {
   rect: Rect = { x: 0, y: 0, w: INNER_W, h: INNER_H };
   /** 0..1, drives the overflow warning. */
   danger = 0;
+  /** Extra distance the danger line sits below the top (Adventure "low ceiling"). */
+  lineOffset = 0;
 
   get left(): number { return this.rect.x; }
   get right(): number { return this.rect.x + this.rect.w; }
@@ -21,7 +23,7 @@ export class Jar {
   get centerX(): number { return this.rect.x + this.rect.w / 2; }
 
   lineY(): number {
-    return this.rect.y + LINE_OFFSET;
+    return this.rect.y + LINE_OFFSET + this.lineOffset;
   }
 
   /** Points along a rounded bottom corner, wall to floor (0 = left, 1 = right). */

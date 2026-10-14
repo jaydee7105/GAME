@@ -42,7 +42,7 @@ Other pieces of the model:
 - **Fair drops** (`World.roll`): planets already exposed at the top of the
   pile are a little more likely to be handed out. The Daily Challenge stays
   identical for everyone.
-- **Adventure**: 100 levels with goals and limited drops (`src/game/levels.ts`),
+- **Adventure**: 500 levels in 25 chapters with goals and limited drops (`src/game/levels-data.json`),
   balanced with a bot simulator (`tools/sim.ts`) so early levels almost always
   win and later chapters and bosses get tougher.
 - **Retention**: achievements with cosmetic jar styles, daily streaks, an

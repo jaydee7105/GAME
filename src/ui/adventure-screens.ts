@@ -4,7 +4,8 @@
 import { Sound } from "../core/audio";
 import { buzz } from "../core/platform";
 import { Save } from "../core/save";
-import { CHAPTERS, CHAPTER_ICON, LEVEL_COUNT, LEVELS_PER_CHAPTER, Level, getLevel, goalText } from "../game/levels";
+import { MECHANICS } from "../game/chapters";
+import { CHAPTERS, LEVEL_COUNT, LEVELS_PER_CHAPTER, Level, chapterOf, getLevel, goalIcon, goalText, levelFeatures } from "../game/levels";
 import { NAMES, PLURALS } from "../game/planets";
 import type { FailReason, RunResult } from "../game/world";
 import { PACING } from "../monetization/config";
@@ -36,7 +37,7 @@ function goalList(level: Level, progress?: number[]): HTMLElement {
   return h("div", { class: "goal-list" }, ...level.goals.map((g, i) => {
     const iconEl = g.kind === "make"
       ? h("img", { src: iconUrl(g.tier!, { face: Save.setting("faces") }), alt: "" })
-      : h("i", { html: icon(g.kind === "score" ? "star" : "planet") });
+      : h("i", { class: `gi-${g.kind}`, html: icon(goalIcon(g)) });
     const done = progress ? (progress[i] ?? 0) >= g.count : false;
     const tail = progress
       ? h("b", { class: done ? "ok" : "" }, done ? "✓" : g.kind === "score" ? `${formatScore(progress[i] ?? 0)}` : `${progress[i] ?? 0}/${g.count}`)
@@ -45,65 +46,128 @@ function goalList(level: Level, progress?: number[]): HTMLElement {
   }));
 }
 
+const TAGS = { hard: "HARD", super: "SUPER HARD", boss: "BOSS" } as const;
+
+function chapterStars(c: number): number {
+  let n = 0;
+  for (let i = 1; i <= LEVELS_PER_CHAPTER; i++) n += Save.levelStars(c * LEVELS_PER_CHAPTER + i);
+  return n;
+}
+
 // ---------------------------------------------------------------------------
-// Level map
+// Level map: one chapter at a time, with arrows to flip between chapters
 // ---------------------------------------------------------------------------
 export function levelMap(screens: Screens, onPlay: (level: number) => void): void {
   const unlocked = Math.min(Save.data.adventure.unlocked, LEVEL_COUNT);
+  let chapter = chapterOf(unlocked);
+  const header = h("div", { class: "chapter-head" });
   const path = h("div", { class: "map" });
-  let current: HTMLElement | null = null;
-  for (let c = 0; c < CHAPTERS.length; c++) {
-    const first = c * LEVELS_PER_CHAPTER + 1;
-    const chapterLocked = first > unlocked;
-    const header = h("div", { class: `chapter${chapterLocked ? " locked" : ""}` },
-      h("img", { src: iconUrl(CHAPTER_ICON[c], { face: !chapterLocked && Save.setting("faces"), locked: chapterLocked }), alt: "" }),
-      h("div", {}, h("small", {}, `CHAPTER ${c + 1}`), h("b", {}, CHAPTERS[c])));
-    path.append(header);
+  const scroll = h("div", { class: "scroll" }, h("div", { class: "col" }, path));
+
+  const render = (dir = 0) => {
+    const c = CHAPTERS[chapter];
+    const first = chapter * LEVELS_PER_CHAPTER + 1;
+    const locked = first > unlocked;
+    const prev = button(icon("back"), "ghost round small", () => go(-1));
+    const next = button(icon("chevron"), "ghost round small", () => go(1));
+    prev.disabled = chapter === 0;
+    next.disabled = chapter === CHAPTERS.length - 1;
+    prev.setAttribute("aria-label", "Previous chapter");
+    next.setAttribute("aria-label", "Next chapter");
+    const mech = c.mechanic !== "basics" ? MECHANICS[c.mechanic] : null;
+    header.replaceChildren(prev,
+      h("div", { class: `chapter${locked ? " locked" : ""}` },
+        h("img", { src: iconUrl(c.icon, { face: !locked && Save.setting("faces"), locked }), alt: "" }),
+        h("div", {},
+          h("small", {}, `CHAPTER ${chapter + 1} OF ${CHAPTERS.length}`),
+          h("b", {}, c.name),
+          h("em", { html: locked
+            ? `${icon("lock")} Clear level ${first - 1} to unlock`
+            : `${icon("star")} ${chapterStars(chapter)} / ${LEVELS_PER_CHAPTER * 3}${mech ? ` &nbsp;·&nbsp; ${icon(mech.icon)} ${mech.name}` : ""}` }))),
+      next);
+
     const nodes = h("div", { class: "nodes" });
+    let current: HTMLElement | null = null;
     for (let i = 0; i < LEVELS_PER_CHAPTER; i++) {
       const id = first + i;
+      const level = getLevel(id);
       const stars = Save.levelStars(id);
-      const locked = id > unlocked;
+      const isLocked = id > unlocked;
       const isCurrent = id === unlocked;
-      const boss = id % 10 === 0;
       const node = h("button", {
-        class: `node${locked ? " locked" : ""}${isCurrent ? " current" : ""}${boss ? " boss" : ""}`,
+        class: `node${isLocked ? " locked" : ""}${isCurrent ? " current" : ""}${level.tag ? " " + level.tag : ""}`,
         type: "button",
         style: { marginLeft: `${Math.round(Math.sin(i * 0.9) * 150)}px` },
         "aria-label": `Level ${id}`,
-      }, h("span", {}, String(id)), stars ? starRow(stars, "tiny") : null);
+      },
+      h("span", {}, String(id)),
+      stars ? starRow(stars, "tiny") : null,
+      level.tag && !isLocked ? h("i", { class: "tag" }, level.tag === "boss" ? "BOSS" : level.tag === "super" ? "SUPER" : "HARD") : null,
+      level.intro && !isLocked ? h("i", { class: "new", html: icon(MECHANICS[level.intro as keyof typeof MECHANICS]?.icon ?? "star") }) : null);
       node.addEventListener("pointerdown", () => Sound.play("click", 1, -4));
       node.addEventListener("click", () => {
-        if (locked) {
+        if (isLocked) {
           node.animate([{ transform: "translateX(-8px)" }, { transform: "translateX(8px)" }, { transform: "translateX(0)" }], { duration: 220 });
           buzz(30, 0.3);
           return;
         }
-        levelIntro(screens, getLevel(id), () => onPlay(id));
+        levelIntro(screens, level, () => onPlay(id));
       });
       if (isCurrent) current = node;
       nodes.append(node);
     }
-    path.append(nodes);
-  }
-  const scroll = h("div", { class: "scroll" }, h("div", { class: "col" }, path));
+    path.replaceChildren(nodes);
+    if (dir) nodes.animate([{ transform: `translateX(${dir * 60}px)`, opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 260, easing: "ease-out" });
+    requestAnimationFrame(() => {
+      if (current) current.scrollIntoView({ block: "center" });
+      else scroll.scrollTop = 0;
+    });
+  };
+  const go = (d: number) => {
+    const n = Math.min(Math.max(chapter + d, 0), CHAPTERS.length - 1);
+    if (n === chapter) return;
+    chapter = n;
+    Sound.play("click", 1.1, -4);
+    render(d);
+  };
+
   const el = h("div", { class: "screen solid" },
     screens.topbar("Adventure"),
     h("div", { class: "subtitle", html: `${icon("star")}&nbsp;${Save.totalStars()} / ${LEVEL_COUNT * 3}` }),
+    header,
     scroll);
   el.style.paddingTop = `${screens.safeTop + 28}px`;
+  // Swipe left/right to change chapter.
+  let sx = 0, sy = 0;
+  scroll.addEventListener("pointerdown", (e) => {
+    sx = e.clientX;
+    sy = e.clientY;
+  });
+  scroll.addEventListener("pointerup", (e) => {
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
+  });
+  render();
   screens.push(el);
-  requestAnimationFrame(() => current?.scrollIntoView({ block: "center" }));
 }
 
 export function levelIntro(screens: Screens, level: Level, onStart: () => void): void {
   const chapter = CHAPTERS[level.chapter];
   const best = Save.levelStars(level.id);
-  const panel = h("div", { class: "panel level-panel" },
-    h("div", { class: "eyebrow" }, `${chapter.toUpperCase()}${level.id % 10 === 0 ? " · BOSS" : ""}`),
+  const intro = level.intro && level.intro !== "basics" ? MECHANICS[level.intro] : null;
+  const chips = levelFeatures(level).filter((m) => m !== level.intro && m !== "basics").map((m) => {
+    const info = MECHANICS[m as keyof typeof MECHANICS];
+    return h("span", { class: "chip", html: `${icon(info.icon)}${info.name}` });
+  });
+  const panel = h("div", { class: `panel level-panel${level.tag ? " " + level.tag : ""}` },
+    h("div", { class: "eyebrow" }, `${chapter.name.toUpperCase()}${level.tag ? ` · ${TAGS[level.tag]}` : ""}`),
     h("h2", {}, `Level ${level.id}`),
     best ? starRow(best) : null,
+    intro ? h("div", { class: "new-card" },
+      h("i", { html: icon(intro.icon) }),
+      h("div", {}, h("small", {}, "NEW!"), h("b", {}, intro.name), h("span", {}, intro.desc))) : null,
     goalList(level),
+    chips.length ? h("div", { class: "chips" }, ...chips) : null,
     h("div", { class: "msg" }, `${level.drops} drops · Finish with drops to spare for more stars`),
     button("PLAY", "primary block", () => {
       screens.closeAll();
@@ -118,7 +182,7 @@ export function levelComplete(screens: Screens, r: RunResult, h_: { next(): void
   const level = getLevel(r.level!);
   const last = level.id >= LEVEL_COUNT;
   const panel = h("div", { class: "panel result" },
-    h("div", { class: "eyebrow" }, CHAPTERS[level.chapter].toUpperCase()),
+    h("div", { class: "eyebrow" }, CHAPTERS[level.chapter].name.toUpperCase()),
     h("h2", {}, `Level ${level.id} complete!`),
     starRow(r.stars ?? 1, "big", true),
     h("div", { class: "msg" }, `${r.dropsLeft} drops to spare · Score ${formatScore(r.score)}`),

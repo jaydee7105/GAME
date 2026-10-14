@@ -8,8 +8,11 @@ technology (TypeScript, WebGL, HTML/CSS) and packaged for Android with Capacitor
 
 ## Features
 
-- **Classic** endless mode, a **Daily Challenge**, and **Adventure**: 100
-  levels in 10 chapters with goals, limited drops, stars and boss levels
+- **Classic** endless mode, a **Daily Challenge**, and **Adventure**: 500
+  levels in 25 chapters. Each chapter adds a mechanic (low gravity, rocks,
+  stardust, clouds, frozen planets, shelves, marked planets, jelly bounce, ice,
+  solar wind, spinners, gravity wells, heavy gravity, low ceiling, narrow jars)
+  and the last chapters remix them, with goals, limited drops, stars and bosses
 - 11 planets, from Asteroid to Sun, modelled procedurally in Blender
   (`art/blender/`) and lit live in WebGL, so they can roll while the light
   stays put
@@ -19,7 +22,7 @@ technology (TypeScript, WebGL, HTML/CSS) and packaged for Android with Capacitor
 - **Daily Challenge** with the same drop sequence for everyone, plus streaks
 - "Fair" drops that favour planets you can actually merge (like Block Blast's
   board-aware piece picker)
-- 22 achievements that unlock 7 cosmetic jar styles
+- 26 achievements that unlock 7 cosmetic jar styles
 - Planet collection with fun facts, stats, and a first-run tutorial
 - Ad-supported the Block Blast way: bottom banner in play, paced interstitials
   between games, and one optional rewarded "Keep going?" revive per run
@@ -63,11 +66,13 @@ npm test           # plays the game with touch input in headless Chrome
 
 CI runs the same smoke test on every push before building Android.
 
-Adventure levels are balanced with a headless bot that plays each level many
-times (`SKILL=0.85` by default):
+Adventure levels are generated, then balanced by a bot that plays every level
+with the real physics:
 
 ```bash
-npx tsx tools/sim.ts 1 20 8      # levels 1..20, 8 attempts each
+npx tsx tools/levelgen.ts         # build src/game/levels-data.json (seeded, repeatable)
+npx tsx tools/calibrate.ts 1 500  # play each level, set its drop budget (~10 min)
+npx tsx tools/sim.ts 120 140 8    # spot-check: levels 120..140, 8 attempts each
 ```
 
 ## Android

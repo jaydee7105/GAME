@@ -18,8 +18,8 @@ Planet Drop is a relaxing, wonderfully satisfying physics puzzle. Drop adorable 
 
 Don't let the jar overflow! Planets that stay above the line for too long end the game.
 
-★ 100 ADVENTURE LEVELS
-Journey from the Asteroid Belt to the Solar Core across 10 chapters. Every level has its own goals and a limited number of drops: finish with drops to spare to earn all three stars. Beat the boss level at the end of each chapter!
+★ 500 ADVENTURE LEVELS
+Journey from the Asteroid Belt to the Solar Core across 25 chapters. Every chapter brings something new: low gravity, space rocks, stardust to collect, frozen planets, spinning bars, gravity wells, solar wind and more. Every level has its own goals and a limited number of drops: finish with drops to spare to earn all three stars. Beat the boss at the end of each chapter!
 
 ★ EASY TO LEARN, HARD TO MASTER
 Drag to aim, let go to drop. One finger is all you need, but planning the perfect chain reaction takes real skill.
@@ -37,7 +37,7 @@ Stuck? Feed a planet to a Black Hole, or Shake the whole jar to shuffle things u
 A fresh puzzle every day: the same planets, in the same order, for everyone. Build your streak!
 
 ★ ACHIEVEMENTS & JAR STYLES
-22 achievements to earn, each with a reward. Unlock glowing Neon, Golden Rings, Comet Ice, Aurora, Solar Flare and Galaxy jars.
+26 achievements to earn, each with a reward. Unlock glowing Neon, Golden Rings, Comet Ice, Aurora, Solar Flare and Galaxy jars.
 
 ★ DISCOVER EVERY PLANET
 Fill your planet collection and learn a fun space fact about each one.

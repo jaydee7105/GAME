@@ -53,7 +53,11 @@ export interface SaveData {
   reminderAsked: boolean;
 }
 
-export interface PlanetSnap { t: number; x: number; y: number; r: number; vx: number; vy: number; w: number }
+export interface PlanetSnap {
+  t: number; x: number; y: number; r: number; vx: number; vy: number; w: number;
+  /** Adventure: ice layers and marked flag. */
+  i?: number; m?: number;
+}
 
 export interface Snapshot {
   mode: Mode;
@@ -75,6 +79,8 @@ export interface Snapshot {
   revived?: boolean;
   dropsLeft?: number;
   goals?: number[];
+  /** Indexes of the stardust already collected. */
+  dustTaken?: number[];
 }
 
 export type Mode = "classic" | "daily" | "adventure";

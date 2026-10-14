@@ -413,3 +413,40 @@ html, body {
 .row2 .btn { flex: 1; }
 .subtitle { display: flex; align-items: center; gap: 6px; }
 .subtitle .icon { width: 30px; height: 30px; }
+
+/* Adventure: chapter map, tags, mechanic cards */
+.chapter-head { display: flex; align-items: center; gap: 10px; flex: none; margin: 0 0 6px; }
+.chapter-head .chapter { flex: 1; margin: 0; min-width: 0; }
+.chapter-head .chapter > div { min-width: 0; }
+.chapter-head .btn.round { width: 72px; height: 72px; flex: none; padding: 0; }
+.chapter-head .btn.round:disabled { opacity: .25; }
+.chapter em { display: flex; align-items: center; gap: 6px; font-style: normal; font-size: 22px; color: var(--gold); margin-top: 4px; white-space: nowrap; }
+.chapter em .icon { width: 24px; height: 24px; }
+.chapter b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.node .tag { position: absolute; top: -16px; font-style: normal; font-size: 16px; font-weight: 700; letter-spacing: 1px; padding: 2px 10px; border-radius: 12px; background: var(--pink); color: #fff; border: 3px solid #1a1240; }
+.node.boss .tag { background: #d9731f; }
+.node.hard { background: #c9448a; border-bottom-color: #8e2a5f; color: #fff; }
+.node.super { background: #8a2be2; border-bottom-color: #5a1a96; color: #fff; }
+.node.hard.locked, .node.super.locked, .node.boss.locked { background: rgba(255,255,255,.08); border-bottom-color: rgba(255,255,255,.04); color: var(--muted); }
+.node .new { position: absolute; right: -14px; top: -10px; width: 40px; height: 40px; border-radius: 50%; background: var(--teal); color: #10303a; display: grid; place-items: center; border: 3px solid #1a1240; }
+.node .new .icon { width: 24px; height: 24px; }
+.new-card { display: flex; gap: 18px; align-items: center; background: linear-gradient(135deg, rgba(63,224,197,.22), rgba(123,108,255,.18)); border: 3px solid rgba(63,224,197,.55); border-radius: 26px; padding: 16px 20px; }
+.new-card > i { width: 76px; height: 76px; flex: none; border-radius: 22px; background: var(--teal); color: #10303a; display: grid; place-items: center; }
+.new-card > i .icon { width: 50px; height: 50px; }
+.new-card small { display: block; color: var(--teal); font-size: 22px; font-weight: 700; letter-spacing: 2px; }
+.new-card b { display: block; font-size: 32px; }
+.new-card span { display: block; font-size: 23px; color: var(--muted); line-height: 1.3; }
+.chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.chip { display: inline-flex; align-items: center; gap: 8px; font-size: 22px; padding: 6px 16px 6px 10px; border-radius: 20px; background: rgba(255,255,255,.08); color: var(--text); }
+.chip .icon { width: 26px; height: 26px; color: var(--teal); }
+.level-panel.hard .eyebrow { color: var(--pink); }
+.level-panel.super .eyebrow { color: #c08bff; }
+.level-panel.boss .eyebrow { color: var(--orange); }
+.gi-dust { color: var(--gold) !important; }
+.gi-clear { color: var(--orange) !important; }
+.gi-chain { color: var(--pink) !important; }
+.next .cloud { display: none; width: 84px; height: 84px; margin-top: 4px; color: #c9d6ff; place-items: center; }
+.next .cloud .icon { width: 70px; height: 70px; }
+.next.clouded img { display: none; }
+.next.clouded .cloud { display: grid; animation: drift 3s ease-in-out infinite alternate; }
+@keyframes drift { from { transform: translateX(-4px); } to { transform: translateX(4px); } }

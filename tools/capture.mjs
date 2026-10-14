@@ -8,8 +8,8 @@ import { chromium } from "playwright-core";
 import fs from "node:fs";
 
 const args = Object.fromEntries(process.argv.slice(2).map((a) => {
-  const [k, v] = a.replace(/^--/, "").split("=");
-  return [k, v ?? "1"];
+  const [k, ...v] = a.replace(/^--/, "").split("=");
+  return [k, v.length ? v.join("=") : "1"];
 }));
 const [size, dpr] = (args.size ?? "390x844@2").split("@");
 const [width, height] = size.split("x").map(Number);
@@ -31,7 +31,7 @@ page.on("console", (m) => {
   if (m.text().startsWith("[scene]")) console.log(m.text());
 });
 if (args.fresh) await ctx.addInitScript(() => localStorage.clear());
-const url = `${args.url ?? "http://localhost:4173"}/?scene=${args.scene ?? "title"}${args.notch ? "&notch=" + args.notch : ""}`;
+const url = `${args.url ?? "http://localhost:4173"}/?scene=${args.scene ?? "title"}${args.notch ? "&notch=" + args.notch : ""}${args.query ? "&" + args.query : ""}`;
 await page.goto(url);
 const steps = (args.steps ?? args.scene ?? "title").split(",");
 for (const step of steps) {

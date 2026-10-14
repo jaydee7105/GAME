@@ -179,16 +179,34 @@ export async function runTestScene(app: App, scene: string): Promise<void> {
       await mark("collection");
       break;
     case "map":
-      Save.data.adventure.unlocked = 14;
-      for (let i = 1; i < 14; i++) Save.data.adventure.stars[i] = 1 + (i % 3);
+      const top = Number(new URLSearchParams(location.search).get("unlocked") ?? 14);
+      Save.data.adventure.unlocked = top;
+      for (let i = 1; i < top; i++) Save.data.adventure.stars[i] = 1 + (i % 3);
       app.openMap();
       await wait(1.2);
       await mark("map");
       break;
     case "intro": {
-      levelIntro(app.screens, getLevel(12), () => app.startGame("adventure", 12));
+      const id = Number(new URLSearchParams(location.search).get("level") ?? 12);
+      levelIntro(app.screens, getLevel(id), () => app.startGame("adventure", id));
       await wait(0.8);
       await mark("intro");
+      break;
+    }
+    case "levels": {
+      // ?scene=levels&ids=41,104,250 : each level after a few seconds of play.
+      Save.data.tutorialDone = true;
+      Save.data.adventure.unlocked = 500;
+      const ids = (new URLSearchParams(location.search).get("ids") ?? "1").split(",").map(Number);
+      for (const id of ids) {
+        app.startGame("adventure", id);
+        app.hud.hideHint();
+        w.autoplay = true;
+        await wait(3.5);
+        w.autoplay = false;
+        await wait(1.2);
+        await mark(`L${id}`);
+      }
       break;
     }
     case "level":

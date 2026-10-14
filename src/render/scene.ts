@@ -10,6 +10,7 @@ import { COLORS, RADII, SATURN, SUN, collisionRadius } from "../game/planets";
 import type { GameWorld, Planet } from "../game/world";
 import type { Assets } from "./assets";
 import { drawFace } from "./face";
+import { drawBars, drawCeiling, drawDust, drawIce, drawMarked, drawRocks, drawWells, drawWind } from "./mechanics";
 import { PlanetGL } from "./planet-gl";
 import { GLOW_SCALE, HALO_SCALE, drawRing, glow, halo } from "./sprites";
 
@@ -88,7 +89,11 @@ export class SceneRenderer {
     b.translate(ox, oy);
     f.translate(ox, oy);
     this.drawJarBack(b, w.jar);
+    drawCeiling(b, w);
+    drawWells(b, w, this.time);
     w.fx.drawBack(b);
+    drawRocks(b, w);
+    drawBars(b, w, this.time);
 
     const faces = Save.setting("faces");
     const all = [...w.planets, ...w.ghosts];
@@ -112,6 +117,10 @@ export class SceneRenderer {
     for (const p of all) {
       if (faces && p.alpha > 0.05) this.drawPlanetFace(f, p.tier, p.x, p.y, p.radius * p.scale, p.angle, p.face.current, p.face.blinking);
     }
+    for (const p of all) {
+      if (p.ice > 0) drawIce(f, p, this.time);
+      if (p.marked && p.alpha > 0.05) drawMarked(f, p, this.time);
+    }
     const rings = all.filter((p) => p.tier === SATURN);
     if (rings.length) {
       f.save();
@@ -120,6 +129,8 @@ export class SceneRenderer {
       f.restore();
     }
 
+    drawDust(f, w, this.time);
+    drawWind(f, w, this.time);
     this.drawJarFront(f, w.jar);
     w.fx.drawFront(f);
   }

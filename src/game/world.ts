@@ -11,7 +11,7 @@ import { ease, Tweens } from "../core/tween";
 import { FaceState } from "../render/face";
 import { Fx } from "./fx";
 import { GLASS, INNER_H, INNER_W, Jar } from "./jar";
-import { Level, getLevel, starsFor } from "./levels";
+import { ICE1, ICE2, Level, MARKED, getLevel, starsFor } from "./levels";
 import * as P from "./planets";
 
 /** Pixels per physics metre. */
@@ -22,6 +22,12 @@ const DROP_COOLDOWN = 0.42;
 const CHAIN_WINDOW = 1.1;
 const DANGER_AGE = 1.4;
 const DANGER_GRACE = 3.0;
+
+/** A fixed or spinning bar inside the jar (world coordinates). */
+export interface BarObstacle { body: Body; x: number; y: number; len: number; angle: number; spin: number }
+export const BAR_THICKNESS = 16;
+/** A merge collects stardust within this distance of the new planet's edge. */
+export const DUST_REACH = 34;
 
 export interface RunResult {
   mode: Mode;
@@ -62,6 +68,10 @@ type WorldEvents = {
   /** Adventure goals: progress per goal, and drops remaining. */
   goals: [progress: number[]];
   dropsLeft: [left: number];
+  /** A level mechanic did something worth a sound or a hint. */
+  thaw: [x: number, y: number];
+  dust: [x: number, y: number, left: number];
+  cleared: [x: number, y: number, left: number];
   levelComplete: [result: RunResult];
 };
 
@@ -82,6 +92,10 @@ export class Planet {
   face = new FaceState();
   /** Collision radius currently applied (grows after a merge). */
   bodyRadius: number;
+  /** Adventure: layers of ice holding it in place (0 = free). */
+  ice = 0;
+  /** Adventure: must be merged away to win. */
+  marked = false;
 
   constructor(tier: number) {
     this.tier = tier;
@@ -121,6 +135,22 @@ export class GameWorld extends Emitter<WorldEvents> {
   failReason: FailReason = "overflow";
   /** Classic/Adventure only: nudge the dropper towards useful planets. */
   fairDrops = true;
+  /** Level obstacles and pickups, in world coordinates. */
+  rocks: { x: number; y: number; r: number }[] = [];
+  bars: BarObstacle[] = [];
+  wells: { x: number; y: number; r: number; s: number }[] = [];
+  dust: { x: number; y: number; taken: boolean }[] = [];
+  /** Current side wind, -1..1 times its strength (for drawing). */
+  wind = 0;
+  windStrength = 0;
+  /** The next-planet preview is hidden (clouds). */
+  hidden = false;
+  cleared = 0;
+  dustTaken = 0;
+  private gravityScale = 1;
+  private bounce = 0.12;
+  private friction = 0.45;
+  private obstacleBodies: Body[] = [];
   private settleTimer = -1;
   private won = false;
 
@@ -189,6 +219,7 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.dropTargetX += dx;
     this.dropX += dx;
     this.buildWalls();
+    this.buildObstacles();
   }
 
   private buildWalls(): void {
@@ -212,13 +243,74 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.walls = body;
   }
 
+  /** Applies a level's physics rules (or the defaults when level is null). */
+  private applyLevel(level: Level | null): void {
+    const m = level?.mods ?? {};
+    this.gravityScale = m.gravity ?? 1;
+    this.bounce = m.bounce ?? 0.12;
+    this.friction = m.slip ? 0.03 : 0.45;
+    this.windStrength = m.wind ?? 0;
+    this.wind = 0;
+    this.hidden = Boolean(m.hidden);
+    this.jar.lineOffset = m.ceiling ?? 0;
+    this.world.setGravity(Vec2(0, (GRAVITY * this.gravityScale) / PPM));
+    this.dust = (level?.dust ?? []).map(() => ({ x: 0, y: 0, taken: false }));
+    this.cleared = 0;
+    this.dustTaken = 0;
+    this.buildObstacles();
+  }
+
+  /** (Re)creates rocks, bars and wells for the current level and jar position. */
+  private buildObstacles(): void {
+    const spinAngles = this.bars.map((b) => b.angle);
+    for (const b of this.obstacleBodies) this.world.destroyBody(b);
+    this.obstacleBodies = [];
+    this.rocks = [];
+    this.bars = [];
+    this.wells = [];
+    const l = this.level;
+    if (!l) return;
+    const j = this.jar;
+    const wx = (fx: number) => j.left + fx * j.rect.w;
+    const wy = (fy: number) => j.top + fy * j.rect.h;
+    const m = (v: number) => v / PPM;
+    const opts = { friction: 0.4, restitution: 0.1 };
+    for (const [fx, fy, r] of l.rocks ?? []) {
+      const x = wx(fx), y = wy(fy);
+      const body = this.world.createBody({ position: Vec2(m(x), m(y)) });
+      body.createFixture(new Circle(m(r)), opts);
+      this.obstacleBodies.push(body);
+      this.rocks.push({ x, y, r });
+    }
+    (l.bars ?? []).forEach(([fx, fy, len, angle, spin], i) => {
+      const x = wx(fx), y = wy(fy);
+      const a = spin ? spinAngles[i] ?? angle : angle;
+      const def = { position: Vec2(m(x), m(y)), angle: a };
+      const body = spin ? this.world.createKinematicBody(def) : this.world.createBody(def);
+      const t = BAR_THICKNESS / 2;
+      body.createFixture(new Box(m(len / 2), m(t)), opts);
+      body.createFixture(new Circle(Vec2(m(-len / 2), 0), m(t)), opts);
+      body.createFixture(new Circle(Vec2(m(len / 2), 0), m(t)), opts);
+      if (spin) body.setAngularVelocity(spin);
+      this.obstacleBodies.push(body);
+      this.bars.push({ body, x, y, len, angle: a, spin });
+    });
+    for (const [fx, fy, r, s] of l.wells ?? []) this.wells.push({ x: wx(fx), y: wy(fy), r, s });
+    (l.dust ?? []).forEach(([fx, fy], i) => {
+      if (!this.dust[i]) this.dust[i] = { x: 0, y: 0, taken: false };
+      this.dust[i].x = wx(fx);
+      this.dust[i].y = wy(fy);
+    });
+  }
+
   // -------------------------------------------------------------------------
   // Run lifecycle
   // -------------------------------------------------------------------------
-  start(mode: Mode, levelId = 1): void {
+  start(mode: Mode, levelRef: number | Level = 1): void {
     this.clear();
     this.mode = mode;
-    this.level = mode === "adventure" ? getLevel(levelId) : null;
+    this.level = mode === "adventure" ? (typeof levelRef === "number" ? getLevel(levelRef) : levelRef) : null;
+    this.applyLevel(this.level);
     this.rng = new Rng(mode === "daily" ? dailySeed() : undefined);
     this.revived = false;
     this.won = false;
@@ -236,11 +328,13 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.currentTier = this.roll(true);
     this.nextTier = this.roll(true);
     if (this.level) {
-      for (const [t, fx, fy] of this.level.start) {
+      for (const [t, fx, fy, flags = 0] of this.level.start) {
         const r = P.RADII[t];
         const x = Math.min(Math.max(this.jar.left + fx * this.jar.rect.w, this.jar.left + r), this.jar.right - r);
         const y = Math.min(this.jar.top + fy * this.jar.rect.h, this.jar.bottom - r);
-        this.spawn(t, x, y).age = 3;
+        const p = this.spawn(t, x, y, -1, flags & ICE2 ? 2 : flags & ICE1 ? 1 : 0);
+        p.age = 3;
+        p.marked = Boolean(flags & MARKED);
       }
     }
     this.begin();
@@ -264,12 +358,21 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.rng = new Rng();
     this.rng.state = s.rng >>> 0;
     this.level = s.mode === "adventure" && s.level ? getLevel(s.level) : null;
+    this.applyLevel(this.level);
     this.revived = Boolean(s.revived);
     this.won = false;
     this.dropsLeft = s.dropsLeft ?? this.level?.drops ?? 0;
     this.goalProgress = this.level ? this.level.goals.map((_, i) => s.goals?.[i] ?? 0) : [];
+    if (this.level) {
+      this.level.goals.forEach((g, i) => {
+        if (g.kind === "clear") this.cleared = this.goalProgress[i];
+      });
+      for (const i of s.dustTaken ?? []) if (this.dust[i]) this.dust[i].taken = true;
+      this.dustTaken = this.dust.filter((d) => d.taken).length;
+    }
     for (const d of s.planets) {
-      const p = this.spawn(d.t, d.x + this.jar.left, d.y + this.jar.top);
+      const p = this.spawn(d.t, d.x + this.jar.left, d.y + this.jar.top, -1, d.i ?? 0);
+      p.marked = Boolean(d.m);
       p.body!.setAngle(d.r);
       p.body!.setLinearVelocity(Vec2(d.vx / PPM, d.vy / PPM));
       p.body!.setAngularVelocity(d.w);
@@ -288,6 +391,7 @@ export class GameWorld extends Emitter<WorldEvents> {
       return {
         t: p.tier, x: r2(p.x - this.jar.left), y: r2(p.y - this.jar.top), r: r2(p.angle),
         vx: r2(v.x * PPM), vy: r2(v.y * PPM), w: r2(p.body!.getAngularVelocity()),
+        ...(p.ice ? { i: p.ice } : {}), ...(p.marked ? { m: 1 } : {}),
       };
     });
     return {
@@ -296,6 +400,7 @@ export class GameWorld extends Emitter<WorldEvents> {
       drops: this.drops, supernovas: this.supernovas, bestChain: this.bestChain, elapsed: this.elapsed,
       rng: this.rng.state, planets,
       level: this.level?.id, revived: this.revived, dropsLeft: this.dropsLeft, goals: this.goalProgress,
+      dustTaken: this.dust.flatMap((d, i) => (d.taken ? [i] : [])),
     };
   }
 
@@ -444,7 +549,7 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.cooldown = this.level && this.dropsLeft <= 0 ? Infinity : DROP_COOLDOWN;
   }
 
-  private spawn(tier: number, x: number, y: number, growFrom = -1): Planet {
+  private spawn(tier: number, x: number, y: number, growFrom = -1, ice = 0): Planet {
     const p = new Planet(tier);
     p.x = x;
     p.y = y;
@@ -456,9 +561,13 @@ export class GameWorld extends Emitter<WorldEvents> {
     });
     const start = growFrom > 0 ? P.collisionRadius(tier) * (growFrom / p.radius) : P.collisionRadius(tier);
     p.bodyRadius = start;
-    body.createFixture(new Circle(start / PPM), { density: 1, friction: 0.45, restitution: 0.12 });
+    body.createFixture(new Circle(start / PPM), { density: 1, friction: this.friction, restitution: this.bounce });
     body.setUserData(p);
     p.body = body;
+    if (ice > 0) {
+      p.ice = ice;
+      body.setStatic();
+    }
     p.face.mood = "normal";
     if (growFrom > 0) {
       p.scale = growFrom / p.radius;
@@ -545,6 +654,7 @@ export class GameWorld extends Emitter<WorldEvents> {
         }
       }
     }
+    this.applyFields();
     this.world.step(STEP, 10, 8);
     this.syncBodies();
     this.handleImpacts();
@@ -552,7 +662,32 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.checkDanger(STEP);
   }
 
+  /** Wind and gravity wells. */
+  private applyFields(): void {
+    const g = (GRAVITY * this.gravityScale) / PPM;
+    if (this.windStrength) {
+      this.wind = Math.sin((this.elapsed * Math.PI * 2) / 7) * this.windStrength;
+      this.world.setGravity(Vec2(this.wind * g, g));
+    }
+    if (!this.wells.length) return;
+    for (const p of this.planets) {
+      if (!p.body || p.ice) continue;
+      for (const w of this.wells) {
+        const dx = w.x - p.x, dy = w.y - p.y;
+        const d = Math.hypot(dx, dy);
+        if (d >= w.r || d < 1) continue;
+        const k = 1 - d / w.r;
+        const mass = p.body.getMass();
+        p.body.applyForceToCenter(Vec2((dx / d) * w.s * g * k * mass, (dy / d) * w.s * g * k * mass), true);
+        // A little drag inside the well so planets settle instead of orbiting.
+        const v = p.body.getLinearVelocity();
+        p.body.setLinearVelocity(Vec2(v.x * (1 - 0.04 * k), v.y * (1 - 0.04 * k)));
+      }
+    }
+  }
+
   private syncBodies(): void {
+    for (const b of this.bars) if (b.spin) b.angle = b.body.getAngle();
     for (const p of this.planets) {
       if (!p.body) continue;
       const pos = p.body.getPosition();
@@ -577,7 +712,7 @@ export class GameWorld extends Emitter<WorldEvents> {
       if (!c.isTouching()) continue;
       const a = c.getFixtureA().getBody().getUserData() as Planet | null;
       const b = c.getFixtureB().getBody().getUserData() as Planet | null;
-      if (!a || !b || a.merging || b.merging || a.tier !== b.tier) continue;
+      if (!a || !b || a.merging || b.merging || a.tier !== b.tier || a.ice || b.ice) continue;
       a.merging = b.merging = true;
       pairs.push([a, b]);
     }
@@ -602,9 +737,11 @@ export class GameWorld extends Emitter<WorldEvents> {
     this.merges++;
     Save.addStat("merges");
     if (this.merges === 1) this.emit("firstMerge");
+    const marked = Number(a.marked) + Number(b.marked);
 
     if (tier === P.SUN) {
       this.supernova(x, y);
+      this.mergeEffects(x, y, P.RADII[P.SUN], marked);
       return;
     }
 
@@ -633,9 +770,49 @@ export class GameWorld extends Emitter<WorldEvents> {
       Sound.play("chain", 1 + 0.08 * Math.min(this.chainCount - 2, 6), -4);
     }
     if (Save.discover(nt)) this.emit("discovered", nt);
+    this.mergeEffects(x, y, P.RADII[nt], marked, true);
     this.updateGoals(nt);
     if (nt === 8) this.award("shake", x, y);
     else if (nt === 9) this.award("blackHole", x, y);
+  }
+
+  /** Level mechanics triggered by a merge at (x, y) making a planet of radius r. */
+  private mergeEffects(x: number, y: number, r: number, marked: number, deferGoals = false): void {
+    if (!this.level) return;
+    if (marked) {
+      this.cleared += marked;
+      this.emit("cleared", x, y, this.markedLeft());
+    }
+    for (const p of this.planets) {
+      if (p.ice && Math.hypot(p.x - x, p.y - y) - p.radius - r < 30) this.crack(p);
+    }
+    for (const d of this.dust) {
+      if (d.taken || Math.hypot(d.x - x, d.y - y) > r + DUST_REACH) continue;
+      d.taken = true;
+      this.dustTaken++;
+      this.fx.burst(d.x, d.y, "#ffe27a", 26, 360, 1.1, 0.9);
+      this.fx.shockwave(d.x, d.y, 70, "rgba(255,226,122,0.9)", 5);
+      this.emit("dust", d.x, d.y, this.dust.length - this.dustTaken);
+    }
+    if (!deferGoals) this.updateGoals();
+  }
+
+  /** Marked planets still in the jar. */
+  markedLeft(): number {
+    return this.planets.filter((p) => p.marked && !p.merging).length;
+  }
+
+  /** Cracks one layer of ice; the planet is freed when none are left. */
+  private crack(p: Planet): void {
+    p.ice--;
+    this.fx.burst(p.x, p.y, "#cdeeff", 22 + p.radius * 0.3, 300, 1.0, 0.8);
+    this.fx.shockwave(p.x, p.y, p.radius * 1.5, "rgba(205,238,255,0.9)", 5);
+    this.emit("thaw", p.x, p.y);
+    if (p.ice > 0 || !p.body) return;
+    p.body.setDynamic();
+    p.body.setAwake(true);
+    p.age = 0.5;
+    p.face.surprise(1.2);
   }
 
   private supernova(x: number, y: number): void {
@@ -686,6 +863,9 @@ export class GameWorld extends Emitter<WorldEvents> {
       if (g.kind === "make" && g.tier === madeTier) this.goalProgress[i]++;
       else if (g.kind === "score") this.goalProgress[i] = this.score;
       else if (g.kind === "merges") this.goalProgress[i] = this.merges;
+      else if (g.kind === "chain") this.goalProgress[i] = this.bestChain;
+      else if (g.kind === "dust") this.goalProgress[i] = this.dustTaken;
+      else if (g.kind === "clear") this.goalProgress[i] = this.cleared;
     });
     this.emit("goals", this.goalProgress);
     const done = this.level.goals.every((g, i) => this.goalProgress[i] >= g.count);
@@ -734,10 +914,10 @@ export class GameWorld extends Emitter<WorldEvents> {
     const line = this.jar.lineY();
     let any = false;
     for (const p of this.planets) {
-      const over = p.age > DANGER_AGE && p.y - p.radius < line;
+      const over = !p.ice && p.age > DANGER_AGE && p.y - p.radius < line;
       if (over) any = true;
       const near = this.dangerTime > 0 && p.y - p.radius < line + 80;
-      p.face.mood = over || near ? "worried" : "normal";
+      p.face.mood = p.ice ? "sleepy" : over || near ? "worried" : "normal";
     }
     if (any && this.dangerSuppress <= 0) {
       const before = this.dangerTime;
@@ -802,7 +982,7 @@ export class GameWorld extends Emitter<WorldEvents> {
     } else {
       // Clear the planets crowding the top of the jar.
       const line = this.jar.lineY();
-      const crowded = [...this.planets].sort((a, b) => a.y - a.radius - (b.y - b.radius));
+      const crowded = this.planets.filter((p) => !p.ice && !p.marked).sort((a, b) => a.y - a.radius - (b.y - b.radius));
       const victims = crowded.filter((p, i) => i < 3 || p.y - p.radius < line + 170);
       for (const p of victims) {
         this.fx.burst(p.x, p.y, P.COLORS[p.tier], 26, 380, 1.2);
@@ -859,6 +1039,11 @@ export class GameWorld extends Emitter<WorldEvents> {
 
   swallow(p: Planet): void {
     this.detach(p);
+    if (p.marked && this.level) {
+      this.cleared++;
+      this.emit("cleared", p.x, p.y, this.markedLeft());
+      this.updateGoals();
+    }
     p.face.surprise(2);
     const hole = { x: p.x, y: p.y, radius: p.radius * 1.15, strength: 0, spin: 0 };
     this.fx.holes.push(hole);
@@ -906,6 +1091,20 @@ export class GameWorld extends Emitter<WorldEvents> {
       const rr = r + p.bodyRadius;
       const dx = Math.abs(x - p.x);
       if (dx < rr && p.y > this.dropY) y = Math.min(y, p.y - Math.sqrt(rr * rr - dx * dx));
+    }
+    const hit = (cx: number, cy: number, cr: number) => {
+      const rr = r + cr;
+      const dx = Math.abs(x - cx);
+      if (dx < rr && cy > this.dropY) y = Math.min(y, cy - Math.sqrt(rr * rr - dx * dx));
+    };
+    for (const k of this.rocks) hit(k.x, k.y, k.r);
+    for (const b of this.bars) {
+      const n = Math.max(Math.ceil(b.len / 6), 1);
+      const c = Math.cos(b.angle), s = Math.sin(b.angle);
+      for (let i = 0; i <= n; i++) {
+        const t = (i / n - 0.5) * b.len;
+        hit(b.x + c * t, b.y + s * t, BAR_THICKNESS / 2);
+      }
     }
     return y;
   }

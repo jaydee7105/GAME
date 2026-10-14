@@ -19,3 +19,6 @@ __pycache__/
 # Secrets
 *.keystore
 *.jks
+tools/out/shard-*.json
+tools/out/*.log
+tools/out/dbg*.ts

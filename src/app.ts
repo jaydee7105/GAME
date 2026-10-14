@@ -1,9 +1,10 @@
 // App root: owns the playfield, the renderer and the UI, and moves between screens.
 
 import { Sound } from "./core/audio";
-import { exitApp, initPlatform, isNative } from "./core/platform";
+import { buzz, exitApp, initPlatform, isNative } from "./core/platform";
 import { Mode, Save, today } from "./core/save";
 import { PRIVACY_URL, disableReminders, enableReminders, maybeAskForReview, scheduleReminder, shareText } from "./core/social";
+import { MECHANICS } from "./game/chapters";
 import { goalText } from "./game/levels";
 import { COLORS, NAMES, PLURALS } from "./game/planets";
 import { FailReason, GameWorld, RunResult } from "./game/world";
@@ -84,6 +85,22 @@ export class App {
     w.on("levelComplete", (r) => this.onLevelComplete(r));
     w.on("powerupEarned", (kind, x, y) => {
       w.fx.text(this.clampX(x), y - 150, kind === "shake" ? "+1 Shake" : "+1 Black Hole", "#c9a6ff", 34, 60, 1.4);
+    });
+    w.on("thaw", (x, y) => {
+      Sound.play("thud", 1.7, -4, 0.05);
+      Sound.play("chain", 1.45, -9);
+      buzz(25, 0.35);
+      w.fx.text(this.clampX(x), y - 60, "CRACK!", "#cdeeff", 34, 60, 0.9);
+    });
+    w.on("dust", (x, y, left) => {
+      Sound.play("chain", 1.6, -5);
+      buzz(15, 0.3);
+      w.fx.text(this.clampX(x), y - 40, left ? "+1 Stardust" : "All stardust!", "#ffe27a", 32, 60, 1);
+    });
+    w.on("cleared", (x, y, left) => {
+      Sound.play("powerup", 1.15, -5);
+      buzz(20, 0.35);
+      w.fx.text(this.clampX(x), y - 70, left ? `${left} to go!` : "All clear!", "#ff9f2e", 34, 60, 1);
     });
     w.on("chain", (n, x, y) => {
       const cols = ["#3fe0c5", "#ffd34d", "#ff9f2e", "#ff6fa8"];
@@ -258,8 +275,10 @@ export class App {
     this.hud.startRun();
     this.beginTutorial();
     if (this.world.level && this.tutorialStep < 0) {
-      this.hud.showHint(this.world.level.goals.map((g) => goalText(g, NAMES, PLURALS)).join(" · "));
-      setTimeout(() => this.state === "game" && this.hud.hideHint(), 2600);
+      const l = this.world.level;
+      const intro = l.intro && l.intro !== "basics" ? MECHANICS[l.intro] : null;
+      this.hud.showHint(intro ? intro.desc : l.goals.map((g) => goalText(g, NAMES, PLURALS)).join(" · "));
+      setTimeout(() => this.state === "game" && this.hud.hideHint(), intro ? 4200 : 2600);
     }
     Ads.showBanner();
     Sound.play("start", 1, -3);
