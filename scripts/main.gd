@@ -32,6 +32,9 @@ var _args := {}
 
 func _ready() -> void:
 	get_tree().set_auto_accept_quit(false)
+	# A daily run only counts on the day it was started.
+	if Save.snapshot.get("mode", "") == "daily" and Save.snapshot.get("date", "") != Save.today():
+		Save.clear_snapshot()
 	get_tree().set_quit_on_go_back(false)
 	_parse_args()
 

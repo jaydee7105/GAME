@@ -27,18 +27,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install SDK packages
-        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.1.0"
+      - name: Install Android SDK packages
+        # GitHub's Ubuntu runners ship the Android SDK (ANDROID_HOME); add what Godot 4.7 targets.
+        run: |
+          sdkm=$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)
+          yes | "$sdkm" --licenses > /dev/null || true
+          "$sdkm" "platform-tools" "platforms;android-36" "build-tools;36.1.0"
 
       - name: Cache Godot
         id: cache-godot
