@@ -1,46 +1,67 @@
 # Planet Drop
 
 Drop cute planets into a jar, merge matching ones, and grow your way from a
-tiny asteroid all the way to the Sun. A physics merge puzzle for Android, made
-with Godot 4.7.
+tiny asteroid all the way to the Sun. A physics merge puzzle built with web
+technology (TypeScript, WebGL, HTML/CSS) and packaged for Android with Capacitor.
 
 ![Feature graphic](store/feature_graphic_1024x500.png)
 
 ## Features
 
 - 11 planets, from Asteroid to Sun, modelled procedurally in Blender
-  (`art/blender/`) and lit in real time so they can roll freely
-- Chain reactions with score multipliers, and a **Supernova** when two Suns merge
+  (`art/blender/`) and lit live in WebGL, so they can roll while the light
+  stays put
+- Box2D physics (planck.js), chain reactions with score multipliers, and a
+  **Supernova** when two Suns merge
 - Power-ups: **Black Hole** (remove a planet) and **Shake** (jolt the jar)
 - **Daily Challenge** with the same drop sequence for everyone, plus streaks
 - Planet collection with fun facts, stats, and a first-run tutorial
 - Your run is saved automatically and resumes after the app is closed
 - Synthesized sound effects and ambient music (`art/audio/synth.py`)
-- Haptics, safe-area support, Android back button, no ads, no tracking
+- Haptics, safe-area support, Android back button, works offline, no ads or tracking
+
+## Quick start
+
+```bash
+npm install
+npm run dev        # play at http://localhost:5173 (mouse: drag to aim, release to drop, Esc to pause)
+```
 
 ## Project layout
 
 | Path | What |
 |---|---|
-| `scripts/game/` | Gameplay: world, planets, jar, dropper, effects |
-| `scripts/ui/` | HUD and screens (title, pause, game over, settings, planets) |
-| `scripts/autoload/` | `Save` (persistence) and `Audio` (sound, music, haptics) |
-| `shaders/planet.gdshader` | Lights the Blender albedo + normal maps |
-| `assets/` | Generated art, audio and the Fredoka font (OFL) |
-| `art/` | Sources that generate the assets (Blender, audio, store tools) |
+| `src/game/` | Rules and physics: world, jar, planets, effects |
+| `src/render/` | WebGL planet lighting, 2D scene, faces, icons |
+| `src/ui/` | HTML/CSS HUD and screens |
+| `src/core/` | Save data, audio, haptics/back button (Capacitor), tweens |
+| `public/assets/` | Planet textures, backdrop, audio, font (all generated, see below) |
+| `android/` | Capacitor Android project |
+| `tools/` | Playwright smoke test and screenshot capture |
+| `art/` | Sources that generate the assets (Blender, audio synth, store art) |
 | `store/` | Play Store icon, feature graphic, screenshots and listing text |
 | `docs/` | Publishing guide and privacy policy |
 
-## Running it
+## Testing
 
-Open the folder in Godot 4.7 and press Play. Desktop testing uses the mouse:
-drag to aim, release to drop, and press Esc to pause.
+```bash
+npm run build && npx vite preview --port 4173 &
+npm test           # plays the game with touch input in headless Chrome
+```
 
-## Building for Android
+CI runs the same smoke test on every push before building Android.
 
-GitHub Actions builds a signed `.aab` and a test `.apk` on every push.
-See **[docs/PUBLISHING.md](docs/PUBLISHING.md)** for signing keys and the
-Google Play steps.
+## Android
+
+GitHub Actions builds a signed `.aab` (for Google Play) and an `.apk` (for
+your phone) on every push. See **[docs/PUBLISHING.md](docs/PUBLISHING.md)**.
+
+To build locally you need Android Studio (or the Android SDK) and JDK 21:
+
+```bash
+npm run android:sync
+cd android && ./gradlew bundleRelease
+```
 
 ## Regenerating assets
 
@@ -51,14 +72,14 @@ python art/blender/background.py          # nebula backdrop
 python art/audio/synth.py                 # sound effects + music (needs ffmpeg)
 ```
 
-Store art is rendered by the game itself:
+Store screenshots are captured from the real game, then captioned:
 
 ```bash
-godot --path . -- --scene=icon --shots=out       # app icons
-godot --path . -- --scene=feature --shots=out    # feature graphic
-godot --path . --resolution 1080x1920 -- --scene=showcase --shots=out
-python art/tools/store_screens.py out            # captioned screenshots
+npm run build && npx vite preview --port 4173 &
+node tools/capture.mjs --scene=showcase --steps=showcase,merge --size=1080x1920@1 --out=shots
+python art/tools/store_screens.py shots
 ```
 
-Other test scenes: `title`, `supernova`, `powerups`, `pause`, `resume`,
-`gameover`, `collection`, `tutorial`, or `--autoplay --every=3 --count=5`.
+Capture scenes: `title`, `showcase`, `supernova`, `powerups`, `pause`,
+`resume`, `gameover`, `collection`, `settings`, `tutorial`, `autoplay`
+(add `?scene=<name>` to the game URL to watch one).

@@ -89,7 +89,7 @@ def main():
 
     px = render_exr(os.path.join(TMP, "background.exr"))
     rgb = np.clip(px[..., :3], 0, 1)
-    out_dir = os.path.join(ROOT, "assets", "bg")
+    out_dir = os.path.join(ROOT, "public", "assets", "bg")
     os.makedirs(out_dir, exist_ok=True)
     from PIL import Image
     Image.fromarray((rgb * 255 + 0.5).astype(np.uint8), "RGB").save(

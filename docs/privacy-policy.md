@@ -7,7 +7,9 @@ Planet Drop is a single-player offline game.
 **We do not collect, store, share or sell any personal data.**
 
 - The game has no accounts, no ads, no analytics and no third-party SDKs.
-- The game does not request internet access.
+- The game never sends anything over the internet. (The Android app's
+  standard "internet" permission comes with its web engine; the game does
+  not use it.)
 - Your scores, settings and progress are saved only on your own device, in the
   app's private storage. Uninstalling the app deletes them.
 - Android's optional "vibrate" permission is used only for haptic feedback,

@@ -2,7 +2,7 @@
 import sys, os, numpy as np
 from PIL import Image
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-P = os.path.join(ROOT, "assets", "planets")
+P = os.path.join(ROOT, "public", "assets", "planets")
 L = np.array([-0.55, 0.62, 0.56]); L /= np.linalg.norm(L)
 names = sys.argv[2:] or ["asteroid","moon","mercury","mars","venus","earth","neptune","uranus","saturn","jupiter","sun"]
 S = 256

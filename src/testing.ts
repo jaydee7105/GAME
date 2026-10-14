@@ -7,6 +7,15 @@ import { COUNT, SUN } from "./game/planets";
 
 const wait = (s: number) => new Promise((r) => setTimeout(r, s * 1000));
 
+/** Waits until a condition holds (checked every animation frame). */
+function until(pred: () => boolean, timeout = 30): Promise<void> {
+  const t0 = performance.now();
+  return new Promise((resolve) => {
+    const tick = () => (pred() || performance.now() - t0 > timeout * 1000 ? resolve() : requestAnimationFrame(tick));
+    tick();
+  });
+}
+
 function mark(label: string): void {
   (window as unknown as { sceneStep: string }).sceneStep = label;
   console.log("[scene]", label);
@@ -56,8 +65,13 @@ export async function runTestScene(app: App, scene: string): Promise<void> {
       await wait(1.0);
       mark("showcase");
       await wait(1.5);
-      w.debugSpawn(6, j.x + j.w / 2 - 40, j.y + 40, 0);
-      await wait(0.75);
+      // Two Neptunes meeting mid-air make an Uranus, for an action shot.
+      const merges = w.merges;
+      w.debugSpawn(6, j.x + j.w / 2 - 95, j.y + 150, 0);
+      w.debugSpawn(6, j.x + j.w / 2 + 75, j.y + 150, 0);
+      await until(() => w.merges > merges);
+      const t0 = w.time;
+      await until(() => w.time - t0 > 0.12);
       mark("merge");
       break;
     }
@@ -70,7 +84,9 @@ export async function runTestScene(app: App, scene: string): Promise<void> {
       w.debugSpawn(SUN, cx - 40, cy + 200);
       w.debugSpawn(SUN, cx + 40, cy - 120);
       for (let i = 0; i < 6; i++) w.debugSpawn(i % 5, cx - 250 + i * 100, cy - 330);
-      await wait(0.9);
+      await until(() => w.supernovas > 0);
+      const t0 = w.time;
+      await until(() => w.time - t0 > 0.35);
       mark("supernova");
       break;
     }
@@ -138,7 +154,10 @@ export async function runTestScene(app: App, scene: string): Promise<void> {
       w.emit("score", w.score, 0);
       await wait(4);
       w.end();
-      await wait(3.6);
+      await until(() => app.state === "over");
+      const final = w.score.toLocaleString("en-US");
+      await until(() => document.querySelector(".result .big")?.textContent === final);
+      await wait(1.2);
       mark("gameover");
       break;
     }

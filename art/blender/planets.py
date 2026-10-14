@@ -26,7 +26,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
-OUT = os.path.join(ROOT, "assets", "planets")
+OUT = os.path.join(ROOT, "public", "assets", "planets")
 TMP = os.path.join(ROOT, "art", "build")
 RES = 512
 SAMPLES = 64

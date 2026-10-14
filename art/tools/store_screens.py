@@ -11,7 +11,7 @@ import sys
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-FONT = os.path.join(ROOT, "assets", "fonts", "Fredoka.ttf")
+FONT = os.path.join(ROOT, "public", "assets", "fonts", "Fredoka.ttf")
 OUT = os.path.join(ROOT, "store", "screenshots")
 W, H = 1080, 1920
 

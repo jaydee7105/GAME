@@ -15,7 +15,7 @@ from scipy import signal
 
 SR = 44100
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-OUT = os.path.join(ROOT, "assets", "audio")
+OUT = os.path.join(ROOT, "public", "assets", "audio")
 rng = np.random.default_rng(7)
 
 
@@ -373,6 +373,9 @@ def music():
         w.writeframes(data.tobytes())
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", wav_path, "-c:a", "libvorbis", "-q:a", "4",
                     os.path.join(OUT, "music.ogg")], check=True)
+    # AAC fallback for browsers without Ogg Vorbis (Safari).
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", wav_path, "-c:a", "aac", "-b:a", "128k",
+                    os.path.join(OUT, "music.m4a")], check=True)
 
 
 def main():
