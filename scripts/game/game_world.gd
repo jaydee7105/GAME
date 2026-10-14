@@ -43,7 +43,7 @@ var elapsed := 0.0
 
 var jar: Jar
 var dropper: Dropper
-var planets_root: Node2D
+var planets_root: Polygon2D
 var fx_root: Node2D
 
 var _rng := RandomNumberGenerator.new()
@@ -63,7 +63,9 @@ var _auto_timer := 0.0
 func _ready() -> void:
 	jar = Jar.new()
 	add_child(jar)
-	planets_root = Node2D.new()
+	# Planets are clipped to the jar so Saturn's rings never poke through the glass.
+	planets_root = Polygon2D.new()
+	planets_root.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
 	add_child(planets_root)
 	fx_root = Node2D.new()
 	fx_root.z_index = 30
@@ -83,6 +85,10 @@ func layout(view: Vector2, safe_top: float, safe_bottom: float) -> void:
 	jar_bottom -= extra * 0.35
 	var top_left := Vector2((view.x - Jar.INNER_W) * 0.5, jar_bottom - Jar.INNER_H)
 	jar.place(top_left)
+	var clip := jar.outline(-Jar.GLASS * 0.5)
+	clip[0].y = -2000.0
+	clip[clip.size() - 1].y = -2000.0
+	planets_root.polygon = clip
 	dropper.position.y = top_left.y - 78.0
 	dropper.min_x = top_left.x
 	dropper.max_x = top_left.x + Jar.INNER_W
@@ -247,7 +253,9 @@ func cancel_press() -> void:
 func drop() -> void:
 	if not running or is_over or not dropper.ready_to_drop or _cooldown > 0.0:
 		return
-	# Drop exactly where the finger is, not where the smoothing has reached.
+	# Drop exactly where the finger is (kept inside the jar), not where the
+	# smoothing has reached.
+	dropper._clamp_target()
 	dropper.position.x = dropper.target_x
 	var p := _spawn(current_tier, dropper.global_position - global_position)
 	p.linear_velocity = Vector2(0, 80)
@@ -316,7 +324,7 @@ func _physics_process(delta: float) -> void:
 
 func _check_merges() -> void:
 	for p in _planets.duplicate():
-		if p.merging or not is_instance_valid(p):
+		if not is_instance_valid(p) or p.merging:
 			continue
 		for b in p.get_colliding_bodies():
 			if b is Planet and b != p and not b.merging and b.tier == p.tier:

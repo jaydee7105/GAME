@@ -140,6 +140,16 @@ func _build() -> void:
 	_footer.position = Vector2(0, view.y - safe_bottom - 84.0)
 	add_child(_footer)
 
+	# Keep the button stack clear of the footer, sliding the logo and planets
+	# up with it on short screens.
+	var stack_h := _buttons.get_combined_minimum_size().y
+	var max_top := _footer.position.y - 36.0 - stack_h
+	if _buttons.position.y > max_top:
+		var shift := _buttons.position.y - max_top
+		_buttons.position.y -= shift
+		_logo.position.y -= shift * 0.8
+		_orbit.position.y -= shift * 0.55
+
 
 func _add_icon(b: Button, kind: String) -> void:
 	for state in ["normal", "hover", "pressed", "disabled"]:

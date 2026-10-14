@@ -6,7 +6,7 @@ var _detail: Control
 
 
 func open() -> void:
-	dim_alpha = 0.94
+	dim_alpha = 0.97
 	_build()
 	show_screen()
 

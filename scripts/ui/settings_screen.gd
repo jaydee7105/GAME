@@ -14,7 +14,7 @@ var _confirm_reset := false
 
 func open(_from_pause: bool = false) -> void:
 	_confirm_reset = false
-	dim_alpha = 0.94
+	dim_alpha = 0.97
 	_build()
 	show_screen()
 

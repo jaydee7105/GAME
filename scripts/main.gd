@@ -404,6 +404,57 @@ func _run_test_hooks() -> void:
 			await PromoArt.render(self, PromoArt.icon(true, false), Vector2i(1024, 1024), dir + "/icon_bg.png")
 		"feature":
 			await PromoArt.render(self, PromoArt.feature(), Vector2i(2048, 1000), dir + "/feature.png")
+		"showcase":
+			# A good-looking mid-game jar for store screenshots.
+			for i in PlanetData.COUNT:
+				Save.discovered[i] = i <= 9
+			Save.tutorial_done = true
+			start_game("classic")
+			world._danger_suppress = 9999.0
+			var r := world.jar.rect
+			var layout := [
+				[9, 0.27, 0.80], [8, 0.73, 0.83], [7, 0.70, 0.55], [5, 0.24, 0.48],
+				[6, 0.46, 0.60], [4, 0.85, 0.34], [3, 0.10, 0.30], [2, 0.42, 0.33],
+				[1, 0.6, 0.30], [0, 0.3, 0.2], [3, 0.53, 0.15], [1, 0.9, 0.1],
+			]
+			for spec in layout:
+				var p := world._spawn(spec[0], r.position + Vector2(r.size.x * spec[1], r.size.y * spec[2]))
+				p.age = 0.0
+				await _wait(0.12)
+			world.highest = 9
+			world.score = 4280
+			hud.start_run("classic")
+			await _wait(3.5)
+			world.dropper.target_x = r.position.x + r.size.x * 0.62
+			await _wait(1.0)
+			await _shot(dir, "showcase")
+			# Then a merge with a chain for an action shot.
+			var c := r.get_center()
+			world._spawn(6, Vector2(c.x - 40, r.position.y + 40)).age = 0.0
+			await _wait(0.75)
+			await _shot(dir, "showcase_merge")
+		"gameover":
+			Save.tutorial_done = true
+			start_game("classic")
+			var r := world.jar.rect
+			for i in 26:
+				world._spawn([2, 3, 4, 5, 6][i % 5], r.position + Vector2(60.0 + (i * 137) % 480, r.size.y - 60.0 - i * 40.0)).age = 2.0
+			world.highest = 8
+			world.score = Save.best + 1361
+			world.merges = 117
+			world.best_chain = 4
+			world.score_changed.emit(world.score, 0)
+			await _wait(4.0)
+			world._end()
+			await _wait(3.6)
+			await _shot(dir, "gameover")
+		"collection":
+			for i in PlanetData.COUNT:
+				Save.discovered[i] = true
+				Save.created[i] = maxi(Save.created[i], 3 + (PlanetData.COUNT - i) * 7)
+			open_planetarium()
+			await _wait(0.8)
+			await _shot(dir, "collection")
 		"tutorial":
 			Save.tutorial_done = false
 			start_game("classic")

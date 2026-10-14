@@ -48,6 +48,7 @@ func clear() -> void:
 	queue_redraw()
 
 
+## Keeps the aim inside the jar for the current planet size.
 func _clamp_target() -> void:
 	var r := PlanetData.RADII[tier] + 1.0
 	target_x = clampf(target_x, min_x + r, max_x - r)
