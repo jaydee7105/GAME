@@ -121,7 +121,7 @@ export class App {
   // Layout & loop
   // -------------------------------------------------------------------------
   private readSafeArea(): { top: number; bottom: number } {
-    const probe = h("div", { style: { position: "fixed", top: "0", left: "0", paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", visibility: "hidden" } });
+    const probe = h("div", { style: { position: "fixed", top: "0", left: "0", paddingTop: "max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px))", paddingBottom: "max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px))", visibility: "hidden" } });
     document.body.append(probe);
     const cs = getComputedStyle(probe);
     const r = { top: parseFloat(cs.paddingTop) || 0, bottom: parseFloat(cs.paddingBottom) || 0 };

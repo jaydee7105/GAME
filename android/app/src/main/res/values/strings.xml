@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Planet Drop</string>
+    <string name="title_activity_main">Planet Drop</string>
+    <string name="package_name">com.jaydee7105.planetdrop</string>
+    <string name="custom_url_scheme">com.jaydee7105.planetdrop</string>
+</resources>
