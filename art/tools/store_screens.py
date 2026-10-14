@@ -2,8 +2,8 @@
 
     python art/tools/store_screens.py <capture_dir>
 
-Raw captures come from the game's test hooks, e.g.
-    godot --resolution 1080x1920 -- --scene=showcase --shots=<capture_dir>
+Raw captures come from the game itself, e.g.
+    node tools/capture.mjs --scene=showcase --steps=showcase,merge --size=1080x1920@1 --out=<capture_dir>
 """
 import os
 import sys
