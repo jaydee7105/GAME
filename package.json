@@ -1,0 +1,30 @@
+{
+  "name": "planet-drop",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Drop planets, merge them into bigger ones, and grow your way to the Sun.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173",
+    "typecheck": "tsc --noEmit",
+    "test": "node tools/smoke.mjs",
+    "android:sync": "npm run build && cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/haptics": "8.0.2",
+    "@capacitor/status-bar": "8.0.4",
+    "planck": "1.5.1"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "8.5.3",
+    "playwright-core": "1.48.2",
+    "typescript": "5.9.3",
+    "vite": "8.3.4"
+  }
+}

@@ -1,12 +1,16 @@
-# Godot
-.godot/
-/android/
-*.translation
-export_credentials.cfg
-
-# Build output
+# Dependencies & build output
+node_modules/
+dist/
 /build/
 art/build/
+
+# Android (Capacitor) build output
+android/app/build/
+android/build/
+android/.gradle/
+android/app/release/
+android/local.properties
+android/capacitor-cordova-android-plugins/build/
 
 # Python
 __pycache__/
