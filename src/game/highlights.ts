@@ -8,6 +8,12 @@ import { USING_TEST_ADS } from "../monetization/config";
 export interface Highlight { id: number; name: string; blurb: string }
 
 export const HIGHLIGHTS: Highlight[] = [
+  { id: 154, name: "Puzzle: Bank Shot", blurb: "A roof hides the twin. Roll a planet down the ramp to reach it." },
+  { id: 156, name: "Puzzle: Tunnel Run", blurb: "The twin waits inside a covered tunnel. Only a rolling planet gets in." },
+  { id: 152, name: "Puzzle: Ice Cage", blurb: "Crack the frozen lid and it drops onto the marked planet." },
+  { id: 190, name: "Puzzle: Sorting Machine", blurb: "Two bins, two marked planets. Send each arrival to the right bin." },
+  { id: 252, name: "Puzzle: Twin Thaw", blurb: "Free two frozen twins so they meet in the funnel." },
+  { id: 442, name: "Puzzle: Last In, First Out", blurb: "Stacked marked planets and pieces in the wrong order. Park wisely." },
   { id: 57, name: "Plinko", blurb: "Bounce planets through a field of pegs." },
   { id: 104, name: "Frozen Shelf", blurb: "A shelf of frozen planets over a giant boulder." },
   { id: 120, name: "Ice Bowl", blurb: "Boss: a bowl of rocks under hanging ice. Set off a chain!" },

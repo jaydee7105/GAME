@@ -40,6 +40,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Every puzzle's stored solution still wins
+        run: npx tsx tools/verify-puzzles.ts
       - name: Smoke test in headless Chrome
         env:
           CHROME_PATH: /usr/bin/google-chrome

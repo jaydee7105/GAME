@@ -306,7 +306,8 @@ function makePuzzle(id: number, prefs: string[], log: (s: string) => void): Leve
         if (process.env.PZ_DUMP && variant === 0) fs.writeFileSync(`${process.env.PZ_DUMP}/fail-${id}-${concept.id}.json`, JSON.stringify(def));
         continue;
       }
-      const xs = p.xs;
+      // Verify exactly what gets stored (rounded), not the planner's raw numbers.
+      const xs = p.xs.map(r4);
       if (xs.length < (d < 0.2 ? 2 : d < 0.5 ? 3 : 4)) { why("too short"); continue; }
       // 1. The plan must win when replayed exactly.
       if (!replay(level, xs)) { why("replay"); continue; }
