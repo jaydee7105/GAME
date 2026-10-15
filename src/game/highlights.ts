@@ -6,9 +6,9 @@
 export interface Highlight { id: number; name: string; blurb: string }
 
 export const HIGHLIGHTS: Highlight[] = [
-  { id: 129, name: "Puzzle: Bank Shot", blurb: "A roof hides the twin. Roll a planet down the ramp to reach it." },
-  { id: 138, name: "Puzzle: Keyhole", blurb: "Only one planet fits through the hole in the box. Park the big ones first." },
-  { id: 125, name: "Puzzle: Missing Step", blurb: "A staircase with a gap. Fill it, then set off the chain." },
+  { id: 171, name: "Puzzle: Bank Shot", blurb: "A roof hides the twin. Roll a planet down the ramp to reach it." },
+  { id: 148, name: "Puzzle: Keyhole", blurb: "Only one planet fits through the hole in the box. Park the big ones first." },
+  { id: 131, name: "Puzzle: Missing Step", blurb: "A staircase with a gap. Fill it, then set off the chain." },
   { id: 180, name: "Puzzle: Ice Cage", blurb: "Crack the frozen lid and it drops onto the marked planet." },
   { id: 175, name: "Puzzle: Last In, First Out", blurb: "Stacked marked planets and pieces in the wrong order. Park wisely." },
   { id: 106, name: "Puzzle: Twin Thaw", blurb: "Free two frozen twins so they meet in the funnel." },
