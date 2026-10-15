@@ -396,14 +396,25 @@ if (process.env.PZ_TRY) {
     recent.push(prefs[id][0]);
   }
   const t0 = Date.now();
-  const shards = Array.from({ length: workers }, (_, k) => ids.filter((_, i) => i % workers === k));
-  await Promise.all(shards.filter((sh) => sh.length).map((shard, k) => new Promise<void>((resolve, reject) => {
-    const child = spawn(process.execPath, ["--import", "tsx", new URL(import.meta.url).pathname], {
-      env: { ...process.env, PZ_WORKER: "1", PZ_IDS: shard.join(","), PZ_PREFS: JSON.stringify(prefs) },
-      stdio: ["ignore", "inherit", "inherit"],
-    });
-    child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`worker ${k} failed`))));
-  })));
+  // Workers handle a few slots each and then exit, so physics garbage never
+  // piles up; a worker that dies just leaves its slots for the next one.
+  const queue = [...ids];
+  const runWorker = async (): Promise<void> => {
+    while (queue.length) {
+      const batch = queue.splice(0, 4);
+      await new Promise<void>((resolve) => {
+        const child = spawn(process.execPath, ["--import", "tsx", new URL(import.meta.url).pathname], {
+          env: { ...process.env, PZ_WORKER: "1", PZ_IDS: batch.join(","), PZ_PREFS: JSON.stringify(prefs) },
+          stdio: ["ignore", "inherit", "inherit"],
+        });
+        child.on("exit", (code) => {
+          if (code !== 0) console.log(`  worker for ${batch.join(",")} exited with ${code}`);
+          resolve();
+        });
+      });
+    }
+  };
+  await Promise.all(Array.from({ length: workers }, () => runWorker()));
   // Pick one puzzle per slot: no idea twice within four puzzles, aiming
   // challenges kept rare, and the least-used idea preferred.
   const levels: LevelDef[] = JSON.parse(fs.readFileSync(DATA, "utf8"));
