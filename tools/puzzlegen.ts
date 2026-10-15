@@ -287,15 +287,15 @@ function buildPuzzle(id: number, concept: Concept, variant: number): { def: Leve
 }
 
 /** Tries ideas (and variants of each) until one passes every check. */
-function makePuzzle(id: number, prefs: string[], log: (s: string) => void): LevelDef | null {
+function makePuzzle(id: number, prefs: string[], log: (s: string) => void, tries = 8): LevelDef | null {
   const reasons: string[] = [];
   const why = (r: string) => reasons.push(r);
   const d = (id - 1) / (LEVEL_COUNT - 1);
   const c = chapterOf(id);
   const greedyLimit = c === 0 ? 2 : d < 0.25 ? 1 : 0; // out of 4 greedy attempts
-  for (const cid of prefs.slice(0, 6)) {
+  for (const cid of prefs) {
     const concept = CONCEPTS.find((x) => x.id === cid)!;
-    for (let variant = 0; variant < 8; variant++) {
+    for (let variant = 0; variant < tries; variant++) {
       const built = buildPuzzle(id, concept, variant);
       if (!built) { why("build/settle"); continue; }
       const { def, kind } = built;
@@ -335,7 +335,7 @@ function makePuzzle(id: number, prefs: string[], log: (s: string) => void): Leve
       return def;
     }
   }
-  log(`  ${id}: NO PUZZLE FOUND (${prefs.slice(0, 6).join(",")}) ${process.env.PZ_TRY ? reasons.join(" ") : ""}`);
+  if (process.env.PZ_TRY) log(`  ${id}: NO PUZZLE FOUND (${prefs.join(",")}) ${reasons.join(" ")}`);
   return null;
 }
 
@@ -353,8 +353,21 @@ if (process.env.PZ_TRY) {
   const prefs: Record<string, string[]> = JSON.parse(process.env.PZ_PREFS!);
   // Each finished puzzle is saved straight away, so an interrupted run can resume.
   for (const id of ids) {
-    const def = makePuzzle(id, prefs[id], (s) => console.log(s));
-    fs.writeFileSync(new URL(`${id}.json`, DONE_DIR), JSON.stringify(def));
+    // Up to three good puzzles per slot, each a different idea; the merge
+    // step then picks one per slot so ideas stay varied across the game.
+    const f = new URL(`${id}.json`, DONE_DIR);
+    const prev = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")) : null;
+    const cands: LevelDef[] = (Array.isArray(prev) ? prev : prev ? [prev] : []).filter(Boolean);
+    let tried = 0;
+    for (const cid of prefs[id]) {
+      if (cands.length >= 3 || (tried >= 10 && cands.length)) break;
+      if (cands.some((c) => c.layout?.endsWith(`puzzle-${cid}`) || c.layout === `puzzle-${cid}`)) continue;
+      tried++;
+      const def = makePuzzle(id, [cid], (s) => console.log(s), cands.length ? 6 : 12);
+      if (def) cands.push(def);
+    }
+    if (!cands.length) console.log(`  ${id}: NO PUZZLE FOUND`);
+    fs.writeFileSync(f, JSON.stringify(cands));
   }
 } else {
   const from = Number(process.argv[2] ?? 1);
@@ -365,8 +378,12 @@ if (process.env.PZ_TRY) {
   fs.mkdirSync(DONE_DIR, { recursive: true });
   for (let id = from; id <= to; id++) {
     if (!isPuzzleSlot(id)) continue;
-    if (fresh) fs.rmSync(new URL(`${id}.json`, DONE_DIR), { force: true });
-    else if (fs.existsSync(new URL(`${id}.json`, DONE_DIR))) continue;
+    const f = new URL(`${id}.json`, DONE_DIR);
+    if (fresh) fs.rmSync(f, { force: true });
+    else if (fs.existsSync(f)) {
+      const v = JSON.parse(fs.readFileSync(f, "utf8"));
+      if (Array.isArray(v) || process.argv.includes("--merge")) continue; // already has its candidates
+    }
     ids.push(id);
   }
   console.log(`${ids.length} puzzle slots to design`);
@@ -387,17 +404,36 @@ if (process.env.PZ_TRY) {
     });
     child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`worker ${k} failed`))));
   })));
-  // Merge every designed puzzle into the level data.
+  // Pick one puzzle per slot: no idea twice within four puzzles, aiming
+  // challenges kept rare, and the least-used idea preferred.
   const levels: LevelDef[] = JSON.parse(fs.readFileSync(DATA, "utf8"));
   const missing: number[] = [];
   let total = 0;
+  const uses = new Map<string, number>();
+  const recentIdeas: string[] = [];
+  const ideaOf = (l: LevelDef) => (l.layout ?? "").replace(/^.*puzzle-/, "");
+  const isAim = (idea: string) => Boolean(CONCEPTS.find((c) => c.id === idea)?.aim);
   for (let id = 1; id <= LEVEL_COUNT; id++) {
     if (!isPuzzleSlot(id)) continue;
     total++;
     const f = new URL(`${id}.json`, DONE_DIR);
-    const def = fs.existsSync(f) ? (JSON.parse(fs.readFileSync(f, "utf8")) as LevelDef | null) : null;
-    if (def) levels[id - 1] = def;
-    else missing.push(id);
+    const raw = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")) : null;
+    const cands: LevelDef[] = (Array.isArray(raw) ? raw : raw ? [raw] : []).filter(Boolean);
+    if (!cands.length) {
+      missing.push(id);
+      continue;
+    }
+    const last = recentIdeas.slice(-4);
+    const aimLately = recentIdeas.slice(-7).some(isAim);
+    const score = (l: LevelDef) => {
+      const idea = ideaOf(l);
+      return (uses.get(idea) ?? 0) + (last.includes(idea) ? 100 : 0) + (isAim(idea) && aimLately ? 50 : 0) + (isAim(idea) ? 3 : 0);
+    };
+    const pick = [...cands].sort((a, b) => score(a) - score(b))[0];
+    levels[id - 1] = pick;
+    const idea = ideaOf(pick);
+    uses.set(idea, (uses.get(idea) ?? 0) + 1);
+    recentIdeas.push(idea);
   }
   // The first puzzle of the game introduces the idea.
   const first = levels.findIndex((l) => l.queue);
