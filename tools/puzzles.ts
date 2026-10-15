@@ -317,4 +317,20 @@ export const CONCEPTS: Concept[] = [
     },
   },
 
+  {
+    id: "lanes", title: "Three Lanes",
+    build(dr, o) {
+      // Walls split the jar into three lanes. Pick a lane for each planet so they build up.
+      const T = clampT(o.T, 3, 5), h = dr.r(230, 290);
+      for (const x of [200, 400]) dr.bar(x, H - h / 2 - 4, h, Math.PI / 2);
+      const tiers = [T - 1, T - 2, T - 3 >= 0 ? T - 3 : 0];
+      for (let i = tiers.length - 1; i > 0; i--) {
+        const j = dr.int(0, i);
+        [tiers[i], tiers[j]] = [tiers[j], tiers[i]];
+      }
+      tiers.forEach((t, k) => rest(dr, t, 100 + k * 200));
+      // Two of the middle size: merging them in their own lane is the trap.
+      return { queue: sprinkle(dr, [T - 2, T - 2], junk(dr, tiers, 1), 1), goals: [make(T)] };
+    },
+  },
 ];

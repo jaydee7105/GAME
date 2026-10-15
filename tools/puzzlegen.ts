@@ -230,11 +230,14 @@ function preferences(id: number, recent: string[]): string[] {
   const ch = CHAPTERS[c];
   const rng = new Rng(hashString(`planet-drop-pref-${id}`));
   const ok = CONCEPTS.filter((cp) => (cp.needs ?? []).every((m) => k.has(m)));
+  // The very first puzzle is the gentlest idea.
+  if (!recent.length) return ["wall", ...ok.map((cp) => cp.id).filter((x) => x !== "wall")];
   const scored = ok.map((cp) => {
-    let s = rng.next();
-    if ((cp.shows ?? []).some((m) => m === ch.mechanic || ch.mix.includes(m))) s += 0.8;
-    const last = recent.lastIndexOf(cp.id);
-    if (last >= 0) s -= 3 - (recent.length - 1 - last) * 0.4;
+    let s = rng.next() * 1.5;
+    if ((cp.shows ?? []).some((m) => m === ch.mechanic || ch.mix.includes(m))) s += 0.6;
+    const age = recent.length - 1 - recent.lastIndexOf(cp.id);
+    if (recent.includes(cp.id) && age < 3) s -= 5;
+    else if (recent.includes(cp.id) && age < 6) s -= 1;
     return { id: cp.id, s };
   });
   return scored.sort((a, b) => b.s - a.s).map((x) => x.id);

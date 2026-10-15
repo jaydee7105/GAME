@@ -497,3 +497,5 @@ html, body {
 .pz-queue small { font-size: 18px; letter-spacing: 2px; color: var(--muted); font-weight: 700; }
 .pz-queue > div { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; }
 .pz-queue img { width: 56px; height: 56px; }
+.topbar .highlights-btn.compact { width: 72px; height: 72px; padding: 0; }
+.topbar .highlights-btn.compact .icon { width: 36px; height: 36px; }

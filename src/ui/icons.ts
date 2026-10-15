@@ -40,7 +40,7 @@ const P: Record<string, string> = {
   lock: `<rect x="5" y="10.5" width="14" height="10" rx="2.2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" stroke-width="2.3"/>`,
   chevron: `<path d="M9 4.5 16.5 12 9 19.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`,
   skull: `<path d="M12 3a8 8 0 0 0-8 8c0 2.7 1.3 4.6 3 5.8V20h10v-3.2c1.7-1.2 3-3.1 3-5.8a8 8 0 0 0-8-8z"/><circle cx="9" cy="11.5" r="1.9" fill="rgba(0,0,0,.45)"/><circle cx="15" cy="11.5" r="1.9" fill="rgba(0,0,0,.45)"/>`,
-  puzzle: `<path d="M9.5 3.5h-4a1.5 1.5 0 0 0-1.5 1.5v4h1.2a2.3 2.3 0 1 1 0 4.6H4v4.9c0 .8.7 1.5 1.5 1.5h4.9v-1.2a2.3 2.3 0 1 1 4.6 0V20h4c.8 0 1.5-.7 1.5-1.5v-4h-1.2a2.3 2.3 0 1 1 0-4.6H20V5c0-.8-.7-1.5-1.5-1.5h-4v1.2a2.3 2.3 0 1 1-4.6 0z"/>`,
+  puzzle: `<path d="M4.6 7.4h3.6a2.6 2.6 0 1 1 5.2 0h3.6V11a2.6 2.6 0 1 1 0 5.2v3.6H4.6z"/>`,
   star: `<path d="m12 2.8 2.7 5.9 6.4.7-4.8 4.3 1.3 6.3L12 16.8 6.4 20l1.3-6.3L2.9 9.4l6.4-.7z"/>`,
 };
 

@@ -134,7 +134,7 @@ export function levelMap(screens: Screens, onPlay: (level: number) => void): voi
   };
 
   const top = screens.topbar("Adventure");
-  if (SHOW_HIGHLIGHTS) top.append(highlightsButton(() => highlightsScreen(screens, onPlay)));
+  if (SHOW_HIGHLIGHTS) top.append(highlightsButton(() => highlightsScreen(screens, onPlay), true));
   const el = h("div", { class: "screen solid" },
     top,
     h("div", { class: "subtitle", html: `${icon("star")}&nbsp;${Save.totalStars()} / ${LEVEL_COUNT * 3}` }),
@@ -155,8 +155,10 @@ export function levelMap(screens: Screens, onPlay: (level: number) => void): voi
   screens.push(el);
 }
 
-export function highlightsButton(onClick: () => void): HTMLButtonElement {
-  const b = button(`${icon("sparkle")}Highlights`, "gold small highlights-btn", onClick);
+export function highlightsButton(onClick: () => void, compact = false): HTMLButtonElement {
+  const b = compact
+    ? button(icon("sparkle"), "gold round highlights-btn compact", onClick)
+    : button(`${icon("sparkle")}Highlights`, "gold small highlights-btn", onClick);
   b.setAttribute("aria-label", "Level highlights");
   return b;
 }

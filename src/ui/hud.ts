@@ -78,7 +78,7 @@ export class Hud {
     world.on("goals", (progress) => this.renderGoals(progress));
     world.on("dropsLeft", (n) => {
       this.dropsNum.textContent = String(Math.max(n, 0));
-      this.dropsEl.classList.toggle("low", n <= 5);
+      this.dropsEl.classList.toggle("low", n <= 5 && !world.queue);
       this.dropsNum.animate([{ transform: "scale(1.25)" }, { transform: "scale(1)" }], { duration: 220, easing: "ease-out" });
     });
 

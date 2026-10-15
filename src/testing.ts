@@ -209,6 +209,32 @@ export async function runTestScene(app: App, scene: string): Promise<void> {
       }
       break;
     }
+    case "puzzle": {
+      // ?scene=puzzle&level=N : a puzzle at the start, with its hint, then solved.
+      Save.data.tutorialDone = true;
+      Save.data.adventure.unlocked = 500;
+      const id = Number(new URLSearchParams(location.search).get("level") ?? 6);
+      const level = getLevel(id);
+      app.startGame("adventure", id);
+      app.hud.hideHint();
+      await wait(1.2);
+      await mark("pz-start");
+      app.startGame("adventure", id, true);
+      app.hud.hideHint();
+      await wait(1);
+      await mark("pz-hint");
+      for (const fx of level.solution ?? []) {
+        await until(() => w.dropReady || w.isOver);
+        if (w.isOver) break;
+        w.dropTargetX = w.jar.left + fx * w.jar.rect.w;
+        w.drop();
+        await wait(0.3);
+      }
+      await until(() => !!document.querySelector(".result"), 15);
+      await wait(1.8);
+      await mark("pz-done");
+      break;
+    }
     case "highlights":
       await wait(1.2);
       await mark("title");
