@@ -79,8 +79,8 @@ function replay(level: Level, xs: number[], jitter = 0, rng?: Rng): boolean {
  * small sample lets lucky ones slip by, so look twice as hard at those that
  * win at all in the first 24 games.
  */
-function randomSpamWins(id: number, level: Level): number {
-  const sr = new Rng(hashString(`spam-${id}`));
+function randomSpamWins(id: number, level: Level, salt = ""): number {
+  const sr = new Rng(hashString(`spam-${salt}${id}`));
   const game = () => replay(level, level.queue!.map(() => 0.02 + sr.next() * 0.96));
   let wins = 0;
   for (let k = 0; k < 24 && wins <= 6; k++) if (game()) wins++;
@@ -351,7 +351,8 @@ function makePuzzle(id: number, prefs: string[], log: (s: string) => void, tries
       let spotWins = 0;
       for (const fx of [0.1, 0.3, 0.5, 0.7, 0.9]) if (replay(level, Array(def.queue!.length).fill(fx))) spotWins++;
       if (spotWins > (c === 0 ? 1 : 0)) { why(`spot-spam ${spotWins}`); continue; }
-      const randWins = randomSpamWins(id, level);
+      // Two independent samples, so a lucky first one isn't enough.
+      const randWins = Math.max(randomSpamWins(id, level), randomSpamWins(id, level, "b"));
       if (randWins > spamLimit(id)) { why(`random-spam ${randWins}`); continue; }
       def.solution = xs.map(r4);
       if (process.env.PZ_DUMP) fs.writeFileSync(`${process.env.PZ_DUMP}/${id}-${concept.id}.json`, JSON.stringify(def));
@@ -404,7 +405,7 @@ if (process.env.PZ_TRY) {
     const raw = JSON.parse(fs.readFileSync(f, "utf8"));
     const cands: LevelDef[] = (Array.isArray(raw) ? raw : [raw]).filter(Boolean);
     const keep = cands.filter((def) => {
-      const wins = randomSpamWins(id, asLevel(def));
+      const wins = Math.max(randomSpamWins(id, asLevel(def)), randomSpamWins(id, asLevel(def), "b"));
       if (wins <= spamLimit(id)) return true;
       console.log(`  ${id} ${def.title}: random spam wins ${wins}/64`);
       return false;
