@@ -1,6 +1,8 @@
-// Designs the puzzle levels (about half of Adventure) into src/game/levels-data.json.
+// Designs the puzzle levels (most of Adventure) into src/game/levels-data.json.
 //
-//   npx tsx tools/puzzlegen.ts [from] [to] [workers]
+//   npx tsx tools/puzzlegen.ts [from] [to] [workers]   design missing slots, then pick
+//   npx tsx tools/puzzlegen.ts --prune [from] [to]       drop saved candidates that spam beats
+//   npx tsx tools/puzzlegen.ts 1 500 4 --refill          ...then redesign emptied and thin slots
 //
 // A puzzle is a starting set-up, a fixed drop order the player can see, and a
 // goal. For each puzzle slot we build set-ups from the same layouts as normal
@@ -10,7 +12,9 @@
 //   - replaying the plan from scratch wins (the solution is stored for hints),
 //   - it still wins when every drop is nudged a few pixels (a person can do it),
 //   - the greedy bot that just grabs the nearest merge usually fails
-//     (so it takes some thinking).
+//     (so it takes some thinking),
+//   - dropping everything at one spot never wins, and dropping at random
+//     spots almost never does (so it can't be mashed through).
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import { Rng, hashString } from "../src/core/rng";
@@ -67,6 +71,28 @@ function replay(level: Level, xs: number[], jitter = 0, rng?: Rng): boolean {
   }
   for (let f = 0; f < 60 * 6 && !w.isOver; f++) w.update(1 / 60);
   return w.hasWon;
+}
+
+/**
+ * Wins out of 64 games where every planet goes to a random spot. A puzzle that
+ * random play beats now and then gets mashed through instead of solved, and a
+ * small sample lets lucky ones slip by, so look twice as hard at those that
+ * win at all in the first 24 games.
+ */
+function randomSpamWins(id: number, level: Level): number {
+  const sr = new Rng(hashString(`spam-${id}`));
+  const game = () => replay(level, level.queue!.map(() => 0.02 + sr.next() * 0.96));
+  let wins = 0;
+  for (let k = 0; k < 24 && wins <= 6; k++) if (game()) wins++;
+  if (wins === 0 || wins > 6) return wins;
+  for (let k = 0; k < 40 && wins <= 6; k++) if (game()) wins++;
+  return wins;
+}
+
+/** Most random-spam wins (of 64) allowed: a few in the first chapter, ~3% later. */
+function spamLimit(id: number): number {
+  const d = (id - 1) / (LEVEL_COUNT - 1);
+  return chapterOf(id) === 0 ? 6 : d < 0.2 ? 3 : 2;
 }
 
 /** The greedy bot, knowing the drop order but never planning ahead. */
@@ -325,10 +351,8 @@ function makePuzzle(id: number, prefs: string[], log: (s: string) => void, tries
       let spotWins = 0;
       for (const fx of [0.1, 0.3, 0.5, 0.7, 0.9]) if (replay(level, Array(def.queue!.length).fill(fx))) spotWins++;
       if (spotWins > (c === 0 ? 1 : 0)) { why(`spot-spam ${spotWins}`); continue; }
-      const sr = new Rng(hashString(`spam-${id}`));
-      let randWins = 0;
-      for (let k = 0; k < 24 && randWins <= 3; k++) if (replay(level, def.queue!.map(() => 0.04 + sr.next() * 0.92))) randWins++;
-      if (randWins > (c === 0 ? 3 : d < 0.2 ? 2 : 1)) { why(`random-spam ${randWins}`); continue; }
+      const randWins = randomSpamWins(id, level);
+      if (randWins > spamLimit(id)) { why(`random-spam ${randWins}`); continue; }
       def.solution = xs.map(r4);
       if (process.env.PZ_DUMP) fs.writeFileSync(`${process.env.PZ_DUMP}/${id}-${concept.id}.json`, JSON.stringify(def));
       log(`  ${String(id).padStart(3)} ${concept.title.padEnd(20)} ${def.goals.map((x) => (x.kind === "make" ? `make ${TIER_NAMES[x.tier!]}` : `${x.kind} ${x.count}`)).join(", ").padEnd(20)} drops ${def.queue!.length}  solved in ${xs.length}  robust ${ok}/6  greedy ${g}/4  v${variant}`);
@@ -369,6 +393,31 @@ if (process.env.PZ_TRY) {
     if (!cands.length) console.log(`  ${id}: NO PUZZLE FOUND`);
     fs.writeFileSync(f, JSON.stringify(cands));
   }
+} else if (process.argv.includes("--prune")) {
+  // Re-checks every saved candidate against the random-spam test and drops
+  // the ones that fail; the next run designs replacements for those slots.
+  const [lo = 1, hi = LEVEL_COUNT] = process.argv.slice(2).filter((a) => !a.startsWith("--")).map(Number);
+  let dropped = 0, emptied = 0;
+  for (let id = lo; id <= hi; id++) {
+    const f = new URL(`${id}.json`, DONE_DIR);
+    if (!isPuzzleSlot(id) || !fs.existsSync(f)) continue;
+    const raw = JSON.parse(fs.readFileSync(f, "utf8"));
+    const cands: LevelDef[] = (Array.isArray(raw) ? raw : [raw]).filter(Boolean);
+    const keep = cands.filter((def) => {
+      const wins = randomSpamWins(id, asLevel(def));
+      if (wins <= spamLimit(id)) return true;
+      console.log(`  ${id} ${def.title}: random spam wins ${wins}/64`);
+      return false;
+    });
+    dropped += cands.length - keep.length;
+    if (keep.length === cands.length) continue;
+    if (keep.length) fs.writeFileSync(f, JSON.stringify(keep));
+    else {
+      fs.rmSync(f);
+      emptied++;
+    }
+  }
+  console.log(`pruned ${dropped} candidates; ${emptied} slots need new puzzles`);
 } else {
   const from = Number(process.argv[2] ?? 1);
   const to = Number(process.argv[3] ?? LEVEL_COUNT);
@@ -382,7 +431,9 @@ if (process.env.PZ_TRY) {
     if (fresh) fs.rmSync(f, { force: true });
     else if (fs.existsSync(f)) {
       const v = JSON.parse(fs.readFileSync(f, "utf8"));
-      if (Array.isArray(v) || process.argv.includes("--merge")) continue; // already has its candidates
+      // --refill also tops up slots that pruning left with a single candidate.
+      const thin = process.argv.includes("--refill") && Array.isArray(v) && v.length < 2;
+      if (!thin && (Array.isArray(v) || process.argv.includes("--merge"))) continue; // already has its candidates
     }
     ids.push(id);
   }

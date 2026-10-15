@@ -2,18 +2,21 @@
 // the web build's demo-ad stand-in.
 
 import { Sound } from "../core/audio";
-import { buzz } from "../core/platform";
+import { buzz, isNative } from "../core/platform";
 import { Save } from "../core/save";
 import { MECHANICS } from "../game/chapters";
-import { HIGHLIGHTS, SHOW_HIGHLIGHTS } from "../game/highlights";
+import { HIGHLIGHTS } from "../game/highlights";
 import { CHAPTERS, LEVEL_COUNT, LEVELS_PER_CHAPTER, Level, chapterOf, getLevel, goalIcon, goalText, levelFeatures } from "../game/levels";
 import { NAMES, PLURALS } from "../game/planets";
 import type { FailReason, RunResult } from "../game/world";
-import { PACING } from "../monetization/config";
+import { PACING, USING_TEST_ADS } from "../monetization/config";
 import { iconUrl } from "../render/sprites";
 import { button, formatScore, h, popIn } from "./dom";
 import { icon } from "./icons";
 import type { Screens } from "./screens";
+
+/** Whether the Highlights shortcut is offered (web and test builds only). */
+export const SHOW_HIGHLIGHTS = !isNative || USING_TEST_ADS;
 
 function starRow(n: number, size = "", animate = false): HTMLElement {
   const row = h("div", { class: `stars ${size}`.trim() });

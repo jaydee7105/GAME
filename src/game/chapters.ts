@@ -78,9 +78,10 @@ export const CHAPTERS: Chapter[] = [
  * a known solution that spamming can't beat. The rest are free-play levels:
  * chapter 1's tutorial, each chapter's mechanic intro and two breathers.
  */
-export function isPuzzleSlot(id: number): boolean {
-  const c = chapterOf(id), i = (id - 1) % LEVELS_PER_CHAPTER;
+export function isPuzzleSlot(levelId: number): boolean {
+  const c = chapterOf(levelId), i = (levelId - 1) % LEVELS_PER_CHAPTER;
   if (c === 0) return i >= 5 && i !== 10;
+  if (levelId === LEVEL_COUNT) return false; // the finale: make the Sun
   return i !== 0 && i !== 6 && i !== 12;
 }
 

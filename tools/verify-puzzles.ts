@@ -1,5 +1,7 @@
-// Replays every puzzle's stored solution with the current game code.
+// Replays every puzzle's stored solution with the current game code, and
+// checks the Highlights tour still points at the puzzles it names.
 //   npx tsx tools/verify-puzzles.ts
+import { HIGHLIGHTS } from "../src/game/highlights";
 import { GameWorld, L } from "./headless";
 
 let ok = 0;
@@ -21,4 +23,10 @@ for (let id = 1; id <= L.LEVEL_COUNT; id++) {
   else bad.push(id);
 }
 console.log(`${ok} puzzle solutions win${bad.length ? `; FAIL: ${bad.join(",")}` : ""}`);
-process.exit(bad.length ? 1 : 0);
+const wrong = HIGHLIGHTS.filter((h) => {
+  const title = L.getLevel(h.id).title;
+  const name = h.name.startsWith("Puzzle: ") ? h.name.slice(8) : null;
+  return name !== (title ?? null);
+});
+for (const h of wrong) console.log(`highlight "${h.name}" points at level ${h.id}: ${L.getLevel(h.id).title ?? "free play"}`);
+process.exit(bad.length || wrong.length ? 1 : 0);

@@ -89,7 +89,7 @@ await page.waitForTimeout(800);
 check(await page.isVisible(".map"), "Adventure opens the level map");
 await page.tap(".node.current", { force: true }); // it pulses, so never "stable"
 await page.waitForTimeout(600);
-await page.tap("text=PLAY");
+await page.tap("button:text-is(\"PLAY\")");
 await page.waitForTimeout(1200);
 const adv = await page.evaluate(() => ({
   state: window.planetDrop.app.state, mode: window.planetDrop.world.mode, drops: window.planetDrop.world.dropsLeft,
@@ -120,7 +120,7 @@ const mech = await page.evaluate(async () => {
   await new Promise((r) => setTimeout(r, 1500));
   const frozen = w.planets.filter((p) => p.ice);
   const still = frozen.every((p) => p.body.isStatic());
-  const markId = find((l) => l.goals.some((g) => g.kind === "clear"));
+  const markId = find((l) => !l.queue && l.start.some((s) => (s[3] ?? 0) & 1));
   app.startGame("adventure", markId);
   await new Promise((r) => setTimeout(r, 800));
   const marked = w.planets.find((p) => p.marked && !p.ice);
@@ -128,15 +128,16 @@ const mech = await page.evaluate(async () => {
   if (marked) { w.toggleBlackHole(); w.pointerDown(marked.x, marked.y); }
   await new Promise((r) => setTimeout(r, 300));
   const clearedAfter = w.cleared;
-  const barId = find((l) => (l.bars ?? []).length > 0 && (l.rocks ?? []).length > 0);
+  const barId = find((l) => (l.bars ?? []).length > 0 && (l.rocks ?? []).length > 0) || find((l) => (l.rocks ?? []).length > 0);
+  const wantBars = (window.planetDrop.levels.getLevel(barId).bars ?? []).length;
   app.startGame("adventure", barId);
   const snap = JSON.parse(JSON.stringify(w.snapshot()));
   w.restore(snap);
-  return { iceId, frozen: frozen.length, still, markId, cleared: clearedAfter, before, marked: !!marked, barId, bars: w.bars.length, rocks: w.rocks.length };
+  return { iceId, frozen: frozen.length, still, markId, cleared: clearedAfter, before, marked: !!marked, barId, wantBars, bars: w.bars.length, rocks: w.rocks.length };
 });
 check(mech.frozen > 0 && mech.still, `frozen planets hang in place (level ${mech.iceId}, ${mech.frozen} frozen)`);
 check(mech.marked && mech.cleared === mech.before + 1, `black-holing a marked planet counts towards its goal (level ${mech.markId})`);
-check(mech.bars > 0 && mech.rocks > 0, `obstacles survive save/restore (level ${mech.barId}: ${mech.bars} bars, ${mech.rocks} rocks)`);
+check(mech.barId > 0 && mech.bars === mech.wantBars && mech.rocks > 0, `obstacles survive save/restore (level ${mech.barId}: ${mech.bars} bars, ${mech.rocks} rocks)`);
 
 // Puzzles: the stored solution solves the level in the real game, and a hint
 // snaps a nearby drop onto the marked spot.
@@ -149,14 +150,15 @@ const pz = await page.evaluate(async () => {
   app.startGame("adventure", id);
   const queueShown = !!document.querySelector(".queue-strip img") || level.queue.length <= 2;
   const restartShown = getComputedStyle([...document.querySelectorAll(".hud .pill")].find((b) => b.textContent.includes("Restart"))).display !== "none";
-  const until = async (pred, ms = 8000) => { const t = performance.now(); while (!pred() && performance.now() - t < ms) await new Promise((r) => setTimeout(r, 30)); };
+  // Software GL can run at ~10 fps, which slows game time, so be patient.
+  const until = async (pred, ms = 30000) => { const t = performance.now(); while (!pred() && performance.now() - t < ms) await new Promise((r) => setTimeout(r, 30)); };
   for (const fx of level.solution) {
     await until(() => w.dropReady || w.isOver);
     if (w.isOver) break;
     w.dropTargetX = w.jar.left + fx * w.jar.rect.w;
     w.drop();
   }
-  await until(() => w.isOver, 10000);
+  await until(() => w.isOver);
   const solved = w.hasWon;
   app.startGame("adventure", id, true);
   await until(() => w.dropReady);

@@ -18,7 +18,8 @@ technology (TypeScript, WebGL, HTML/CSS) and packaged for Android with Capacitor
   Keyhole, Missing Step, Ice Key, Small Steps, Sorting Machine...). Every
   puzzle ships with a solution found by a planning bot, and is rejected unless
   spamming (one spot, or random spots) fails; a video-ad hint shows the way.
-  The rest are free-play levels: tutorial, each chapter's intro and breathers
+  The rest are free-play levels: tutorial, each chapter's intro, breathers and
+  the finale
 - 11 planets, from Asteroid to Sun, modelled procedurally in Blender
   (`art/blender/`) and lit live in WebGL, so they can roll while the light
   stays put
@@ -78,6 +79,8 @@ with the real physics:
 ```bash
 npx tsx tools/levelgen.ts         # build src/game/levels-data.json (seeded, repeatable)
 npx tsx tools/puzzlegen.ts        # design the puzzle levels (planner + checks, ~30 min)
+npx tsx tools/puzzlegen.ts --prune  # drop saved puzzles that random spam beats...
+npx tsx tools/puzzlegen.ts 1 500 4 --refill  # ...and design replacements
 npx tsx tools/calibrate.ts 1 500  # play each regular level, set its drop budget (~10 min)
 npx tsx tools/verify-puzzles.ts   # replay every puzzle's stored solution (also run in CI)
 npx tsx tools/spamcheck.ts 1 500  # how often spamming wins each level
