@@ -132,7 +132,7 @@ function value(w: World, kind: Kind): number {
       v += (dt === 0 && !p.ice && !q.ice ? 6 : 3) * Math.exp(-gap / 90);
     }
   }
-  if (kind === "clear") {
+  if (kind === "clear" || w.planets.some((p) => p.marked)) {
     v += 400 * w.cleared;
     // Reward having a same-size planet near each remaining marked one.
     for (const m of w.planets) {
@@ -141,7 +141,8 @@ function value(w: World, kind: Kind): number {
       for (const q of w.planets) if (q !== m && q.tier === m.tier && !q.marked) best = Math.min(best, Math.hypot(q.x - m.x, q.y - m.y));
       v -= best * 0.05;
     }
-  } else if (kind === "dust") {
+  }
+  if (w.dust.length) {
     v += 400 * w.dustTaken;
     for (const d of w.dust) {
       if (d.taken) continue;
@@ -149,7 +150,8 @@ function value(w: World, kind: Kind): number {
       for (const q of w.planets) best = Math.min(best, Math.hypot(q.x - d.x, q.y - d.y) - q.radius);
       v -= best * 0.04;
     }
-  } else if (kind === "chain") v += 250 * w.bestChain;
+  }
+  if (kind === "chain") v += 250 * w.bestChain;
   v += 60 * w.planets.filter((p) => p.ice).length * -1;
   return v;
 }
@@ -258,7 +260,20 @@ function buildPuzzle(id: number, concept: Concept, variant: number): { def: Leve
   const rules: Mechanic[] = ["lowgrav", "heavy", "bouncy", "slippery"];
   const rule = [CHAPTERS[c].mechanic, ...CHAPTERS[c].mix].find((m) => rules.includes(m));
   if (rule && rng.next() < 0.65) MODS[rule]!(dr, d, false);
-  dr.goals = built.goals;
+  // Later puzzles ask for more: filler planets to park without spoiling the
+  // set-up, a stardust side-quest, and less room under the ceiling.
+  const queue = [...built.queue];
+  const extra = d > 0.15 ? dr.int(0, Math.floor(d * 3)) : 0;
+  for (let k = 0; k < extra; k++) queue.splice(1 + dr.int(0, queue.length - 1), 0, dr.int(0, 1));
+  const goals = [...built.goals];
+  if (d > 0.35 && known(c).has("dust") && !goals.some((g) => g.kind === "dust") && rng.next() < 0.35) {
+    const n = dr.int(1, 2);
+    for (let k = 0; k < 40 && dr.dust.length < n; k++) dr.dustAt(dr.r(60, 540), dr.r(560, 720));
+    if (dr.dust.length) goals.push({ kind: "dust", count: dr.dust.length });
+  }
+  if (d > 0.55 && !dr.mods.ceiling && rng.next() < 0.35) dr.mods.ceiling = Math.round(dr.r(80, 140));
+  built.queue = queue;
+  dr.goals = goals;
   dr.names.push(`puzzle-${concept.id}`);
   const def = dr.def(built.queue.length);
   const s = settle(def);
@@ -292,7 +307,7 @@ function makePuzzle(id: number, prefs: string[], log: (s: string) => void): Leve
         continue;
       }
       const xs = p.xs;
-      if (xs.length < 2) { why("too short"); continue; }
+      if (xs.length < (d < 0.2 ? 2 : d < 0.5 ? 3 : 4)) { why("too short"); continue; }
       // 1. The plan must win when replayed exactly.
       if (!replay(level, xs)) { why("replay"); continue; }
       // 2. ...and when every drop is nudged (a person can actually do it).
