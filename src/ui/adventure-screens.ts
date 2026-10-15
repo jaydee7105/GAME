@@ -198,7 +198,7 @@ export function levelIntro(screens: Screens, level: Level, onStart: () => void):
   });
   const puzzle = Boolean(level.queue);
   const panel = h("div", { class: `panel level-panel${level.tag ? " " + level.tag : ""}${puzzle ? " puzzle" : ""}` },
-    h("div", { class: "eyebrow" }, `${puzzle ? "PUZZLE" : chapter.name.toUpperCase()}${level.tag ? ` · ${TAGS[level.tag]}` : ""}`),
+    h("div", { class: "eyebrow" }, `${puzzle ? "PUZZLE" : level.intro ? chapter.name.toUpperCase() : "FREE PLAY"}${level.tag ? ` · ${TAGS[level.tag]}` : ""}`),
     h("h2", {}, `Level ${level.id}`),
     puzzle && level.title ? h("div", { class: "pz-title", html: `${icon("puzzle")}${level.title}` }) : null,
     best ? starRow(best) : null,

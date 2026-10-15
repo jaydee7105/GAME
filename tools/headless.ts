@@ -109,3 +109,68 @@ export function settle(def: LevelDef, seconds = 4): { start: LevelDef["start"]; 
   const high = w.planets.some((p) => p.y - p.radius < j.lineY() + 120);
   return { start, merged: w.merges > 0 || w.planets.length !== n0 || w.isOver, high };
 }
+
+/**
+ * A thinking bot: tries each candidate drop spot with the real physics (save,
+ * drop, let it settle, score the jar, restore) and picks the best. Much
+ * stronger than chooseX, roughly how a careful player plays.
+ */
+export function lookahead(w: World): number {
+  const snap = w.snapshot();
+  if (!snap || !w.level) return chooseX(w, 1);
+  const t = w.currentTier;
+  const r = P.RADII[t];
+  const lo = w.jar.left + r + 1, hi = w.jar.right - r - 1;
+  const xs: number[] = [];
+  for (let i = 0; i <= 12; i++) xs.push(lo + ((hi - lo) * i) / 12);
+  for (const p of w.planets) if (p.tier === t || p.marked || p.ice) xs.push(p.x, p.x - (p.radius + r) * 0.85, p.x + (p.radius + r) * 0.85);
+  for (const d of w.dust) if (!d.taken) xs.push(d.x);
+  const level = w.level;
+  const sim = new GameWorld();
+  sim.layout(720, 1280, 0, 0);
+  let best = xs[0], bestV = -Infinity;
+  for (const x0 of xs) {
+    const x = Math.min(Math.max(x0, lo), hi);
+    sim.restore(JSON.parse(JSON.stringify(snap)), level);
+    sim.dropTargetX = x;
+    sim.drop();
+    for (let f = 0; f < 150 && !sim.isOver; f++) sim.update(1 / 60);
+    const v = sim.hasWon ? 1e9 : sim.isOver ? -1e9 : judge(sim);
+    if (v > bestV) {
+      bestV = v;
+      best = x;
+    }
+  }
+  return best;
+}
+
+/** How promising a jar looks: progress on goals, merged-ness, room to spare. */
+export function judge(w: World): number {
+  const lv = w.level!;
+  let v = 0;
+  lv.goals.forEach((g, i) => (v += 600 * Math.min(w.goalProgress[i] / g.count, 1)));
+  let pot = 0, top = Infinity;
+  for (const p of w.planets) {
+    pot += Math.pow(2, 1.3 * p.tier);
+    top = Math.min(top, p.y - p.radius);
+  }
+  v += Math.log2(1 + pot) * 10 - w.planets.length * 1.2;
+  const room = top - w.jar.lineY();
+  if (room < 200) v -= (200 - room) * 0.6;
+  const ps = w.planets;
+  for (let a = 0; a < ps.length; a++) {
+    for (let b = a + 1; b < ps.length; b++) {
+      const p = ps[a], q = ps[b];
+      if (Math.abs(p.tier - q.tier) > 1) continue;
+      const gap = Math.max(Math.hypot(p.x - q.x, p.y - q.y) - p.radius - q.radius, 0);
+      v += (p.tier === q.tier ? 5 : 2) * Math.exp(-gap / 90);
+    }
+  }
+  for (const d of w.dust) {
+    if (d.taken) continue;
+    let near = 600;
+    for (const q of ps) near = Math.min(near, Math.hypot(q.x - d.x, q.y - d.y) - q.radius);
+    v -= near * 0.05;
+  }
+  return v;
+}

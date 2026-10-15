@@ -23,6 +23,8 @@ export interface Concept {
   needs?: Mechanic[];
   /** Mechanics this idea shows off (preferred in those chapters). */
   shows?: Mechanic[];
+  /** An aiming challenge: the "greedy player fails" check is skipped (spam checks still apply). */
+  aim?: boolean;
   build(dr: Draft, o: Opts): { queue: number[]; goals: Goal[] } | null;
 }
 
@@ -67,6 +69,28 @@ function sprinkle(dr: Draft, q: number[], items: number[], keep = 0): number[] {
   const out = [...q];
   for (const it of items) out.splice(keep + dr.int(0, out.length - keep), 0, it);
   return out;
+}
+
+/** Three narrow bins, one planet in each (marked or not), and one right bin per arrival. */
+function bins(dr: Draft, o: Opts, marked: boolean): { queue: number[]; goals: Goal[] } | null {
+  const tiers = [1, 2, 3];
+  for (let i = 2; i > 0; i--) {
+    const j = dr.int(0, i);
+    [tiers[i], tiers[j]] = [tiers[j], tiers[i]];
+  }
+  const inner = 2 * R[3] + 10, h = 2 * R[3] + 2 * R[4] + 8;
+  const xs = [mx(o, 105), 300, mx(o, 495)];
+  for (let k = 0; k < 3; k++) {
+    for (const sx of [-1, 1]) dr.bar(xs[k] + sx * (inner / 2 + 8), H - h / 2 - 4, h, Math.PI / 2);
+    if (!rest(dr, tiers[k], xs[k], marked ? 1 : 0)) return null;
+  }
+  const q = [...tiers];
+  for (let i = 2; i > 0; i--) {
+    const j = dr.int(0, i);
+    [q[i], q[j]] = [q[j], q[i]];
+  }
+  q.splice(dr.int(1, 3), 0, 0);
+  return { queue: q, goals: marked ? [{ kind: "clear", count: 3 }] : [{ kind: "merges", count: 3 }] };
 }
 
 export const CONCEPTS: Concept[] = [
@@ -303,19 +327,85 @@ export const CONCEPTS: Concept[] = [
     },
   },
   {
-    id: "sorting", title: "Sorting Machine", needs: ["clear"], shows: ["clear", "narrow"],
+    id: "sorting", title: "Sorting Machine", needs: ["clear"], shows: ["clear", "narrow"], aim: true,
     build(dr, o) {
-      // Two bins, two marked planets. Send each arriving planet to the right bin.
-      const a = dr.int(1, 2), b = a + 1, gap = 2 * R[b] + 14, h = 2 * R[b] + 10;
-      const xs = [mx(o, 170), mx(o, 430)];
-      const tiers = dr.chance(0.5) ? [a, b] : [b, a];
-      for (let k = 0; k < 2; k++) {
-        for (const sx of [-1, 1]) dr.bar(xs[k] + sx * (gap / 2 + 8), H - h / 2 - 4, h, Math.PI / 2);
-        if (!rest(dr, tiers[k], xs[k], 1)) return null;
-      }
-      return { queue: [b, ...junk(dr, [a, b], 1), a], goals: [{ kind: "clear", count: 2 }] };
+      // Three narrow bins with a marked planet in each. Every arrival has one
+      // right bin; a wrong one sits on top and plugs that bin for good.
+      return bins(dr, o, true);
     },
   },
+  {
+    id: "bins", title: "Pigeonholes", shows: ["narrow"], aim: true,
+    build(dr, o) {
+      // Three narrow bins, a planet in each. Put every arrival in the bin where it merges.
+      return bins(dr, o, false);
+    },
+  },
+  {
+    id: "missingstep", title: "Missing Step",
+    build(dr, o) {
+      // A staircase with one step missing. Drop the missing size into the gap,
+      // then set the whole staircase off from the small end.
+      const a = dr.int(0, 2), gapAt = dr.int(1, 2), m = a + gapAt;
+      let x = 6;
+      for (let k = 0; k < 4; k++) {
+        const t = a + k;
+        x += R[t];
+        if (k !== gapAt && !rest(dr, t, mx(o, x))) return null;
+        x += R[t] + (k === gapAt ? 6 : 2);
+      }
+      const q = [...junk(dr, [a, a + 1, a + 2, a + 3], 1), m, a];
+      return { queue: q, goals: [make(a + 4)] };
+    },
+  },
+  {
+    id: "keyhole", title: "Keyhole", shows: ["shelves"],
+    build(dr, o) {
+      // A covered box with a small hole in the roof. Inside, a row of growing
+      // planets waits for the one that fits through the hole. Big planets
+      // dropped on the hole plug it.
+      const k = dr.int(0, 2);
+      const row = [k + 1, k];
+      const inner = 2 * (R[k + 1] + R[k]) + 12;
+      const hb = 2 * R[k + 1] + 16;
+      const cx = mx(o, dr.r(200, 330));
+      const x0 = cx - inner / 2, x1 = cx + inner / 2;
+      for (const x of [x0 - 8, x1 + 8]) dr.bar(x, H - hb / 2 - 2, hb, Math.PI / 2);
+      let x = x0 + 3;
+      const order = o.m ? [...row].reverse() : row;
+      let holeX = 0;
+      for (const t of order) {
+        x += R[t];
+        if (!rest(dr, t, x)) return null;
+        if (t === k) holeX = x;
+        x += R[t] + 2;
+      }
+      const g = 2 * R[k] + 14, roofY = H - hb - 6;
+      const l = holeX - g / 2 - (x0 - 16), r = x1 + 16 - (holeX + g / 2);
+      if (l > 20) dr.bar(x0 - 16 + l / 2, roofY, l, 0);
+      if (r > 20) dr.bar(holeX + g / 2 + r / 2, roofY, r, 0);
+      // Filler too big for the hole comes first.
+      const q = [k + 1 + dr.int(1, 2), k + 1, k];
+      return { queue: q, goals: [make(k + 2)] };
+    },
+  },
+  {
+    id: "window", title: "Roof Window",
+    build(dr, o) {
+      // Like Over the Wall, but your side has a roof with one narrow window.
+      const T = clampT(o.T, 3, 5), h = dr.r(250, 300);
+      dr.bar(mx(o, 300), H - h / 2 - 4, h, Math.PI / 2);
+      if (!rest(dr, T, mx(o, R[T] + 4))) return null;
+      if (!rest(dr, T - 1, mx(o, 300 + 12 + R[T - 1] + dr.r(10, 60)))) return null;
+      const roofY = H - h - 6, w = 2 * R[T - 1] + 16;
+      const wx = dr.r(2 * R[T] + w / 2 + 10, 292 - w / 2);
+      const l = wx - w / 2, r = 300 - (wx + w / 2);
+      if (l > 20) dr.bar(mx(o, l / 2), roofY, l, 0);
+      if (r > 20) dr.bar(mx(o, wx + w / 2 + r / 2), roofY, r, 0);
+      return { queue: sprinkle(dr, [T - 1, T - 1], junk(dr, [T - 1, T], 2), 1), goals: [make(T + 1)] };
+    },
+  },
+
 
   {
     id: "lanes", title: "Three Lanes",
@@ -331,6 +421,22 @@ export const CONCEPTS: Concept[] = [
       tiers.forEach((t, k) => rest(dr, t, 100 + k * 200));
       // Two of the middle size: merging them in their own lane is the trap.
       return { queue: sprinkle(dr, [T - 2, T - 2], junk(dr, tiers, 1), 1), goals: [make(T)] };
+    },
+  },
+  {
+    id: "smallsteps", title: "Small Steps", needs: ["dust"], shows: ["dust", "narrow"],
+    build(dr, o) {
+      // Stardust inside a roofed room with a low doorway. Roll the two halves
+      // in one at a time and merge them inside: merged outside, they won't fit.
+      const k = dr.int(1, 2), door = 2 * R[k] + 16;
+      const cw = 2 * R[k + 1] + 40, wallX = W - cw - 8, roofY = H - dr.r(230, 270);
+      dr.bar(mx(o, wallX), (roofY + (H - door)) / 2, H - door - roofY, Math.PI / 2);
+      dr.bar(mx(o, wallX + cw / 2 + 4), roofY, cw + 16, 0);
+      dr.dust.push([mx(o, W - cw / 2 - 4), H - 34]);
+      // A ramp down to the doorway.
+      const x0 = 40, y0 = dr.r(470, 520), x1 = wallX - 2 * R[k] - 44, y1 = H - 10;
+      dr.bar(mx(o, (x0 + x1) / 2), (y0 + y1) / 2, Math.hypot(x1 - x0, y1 - y0), ma(o, Math.atan2(y1 - y0, x1 - x0)));
+      return { queue: sprinkle(dr, [k, k], [k + 2], 1), goals: [{ kind: "dust", count: 1 }] };
     },
   },
 ];

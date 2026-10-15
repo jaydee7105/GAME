@@ -308,7 +308,7 @@ function makePuzzle(id: number, prefs: string[], log: (s: string) => void): Leve
       }
       // Verify exactly what gets stored (rounded), not the planner's raw numbers.
       const xs = p.xs.map(r4);
-      if (xs.length < (d < 0.2 ? 2 : d < 0.5 ? 3 : 4)) { why("too short"); continue; }
+      if (xs.length < 2) { why("too short"); continue; }
       // 1. The plan must win when replayed exactly.
       if (!replay(level, xs)) { why("replay"); continue; }
       // 2. ...and when every drop is nudged (a person can actually do it).
@@ -320,7 +320,15 @@ function makePuzzle(id: number, prefs: string[], log: (s: string) => void): Leve
       const gr = new Rng(hashString(`greedy-${id}`));
       let g = 0;
       for (let k = 0; k < 4; k++) if (greedy(level, 6, gr)) g++;
-      if (g > greedyLimit) { why(`greedy ${g}`); continue; }
+      if (g > greedyLimit && !concept.aim) { why(`greedy ${g}`); continue; }
+      // 4. Spamming mustn't work: every planet at one spot, or at random spots.
+      let spotWins = 0;
+      for (const fx of [0.1, 0.3, 0.5, 0.7, 0.9]) if (replay(level, Array(def.queue!.length).fill(fx))) spotWins++;
+      if (spotWins > (c === 0 ? 1 : 0)) { why(`spot-spam ${spotWins}`); continue; }
+      const sr = new Rng(hashString(`spam-${id}`));
+      let randWins = 0;
+      for (let k = 0; k < 24 && randWins <= 3; k++) if (replay(level, def.queue!.map(() => 0.04 + sr.next() * 0.92))) randWins++;
+      if (randWins > (c === 0 ? 3 : d < 0.2 ? 2 : 1)) { why(`random-spam ${randWins}`); continue; }
       def.solution = xs.map(r4);
       if (process.env.PZ_DUMP) fs.writeFileSync(`${process.env.PZ_DUMP}/${id}-${concept.id}.json`, JSON.stringify(def));
       log(`  ${String(id).padStart(3)} ${concept.title.padEnd(20)} ${def.goals.map((x) => (x.kind === "make" ? `make ${TIER_NAMES[x.tier!]}` : `${x.kind} ${x.count}`)).join(", ").padEnd(20)} drops ${def.queue!.length}  solved in ${xs.length}  robust ${ok}/6  greedy ${g}/4  v${variant}`);
@@ -335,7 +343,8 @@ function makePuzzle(id: number, prefs: string[], log: (s: string) => void): Leve
 if (process.env.PZ_TRY) {
   // Debug: try every idea on one slot, e.g. PZ_TRY=130 npx tsx tools/puzzlegen.ts
   const id = Number(process.env.PZ_TRY);
-  for (const cp of CONCEPTS) {
+  const only = process.env.PZ_ONLY?.split(",");
+  for (const cp of CONCEPTS.filter((c) => !only || only.includes(c.id))) {
     const t0 = Date.now();
     makePuzzle(id, [cp.id], (s) => console.log(s.trim(), `(${((Date.now() - t0) / 1000).toFixed(1)} s)`));
   }

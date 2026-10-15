@@ -74,15 +74,14 @@ export const CHAPTERS: Chapter[] = [
 ];
 
 /**
- * About half the levels are puzzles: a fixed drop order you can see, and a
- * set-up with a known solution. Chapter intros stay regular levels.
+ * Most levels are puzzles: a fixed drop order you can see, and a set-up with
+ * a known solution that spamming can't beat. The rest are free-play levels:
+ * chapter 1's tutorial, each chapter's mechanic intro and two breathers.
  */
 export function isPuzzleSlot(id: number): boolean {
   const c = chapterOf(id), i = (id - 1) % LEVELS_PER_CHAPTER;
-  if (c === 0) return i >= 5 && i % 2 === 1 && i < 19;
-  if (i === 0) return false;
-  if (i === LEVELS_PER_CHAPTER - 1) return c % 2 === 1;
-  return i % 2 === 1 || (c >= 9 && i === 10);
+  if (c === 0) return i >= 5 && i !== 10;
+  return i !== 0 && i !== 6 && i !== 12;
 }
 
 export function chapterOf(levelId: number): number {

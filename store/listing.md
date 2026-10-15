@@ -19,7 +19,7 @@ Planet Drop is a relaxing, wonderfully satisfying physics puzzle. Drop adorable 
 Don't let the jar overflow! Planets that stay above the line for too long end the game.
 
 ★ CLEVER PUZZLES
-Half of the levels are puzzles: you can see every planet you'll get, in order. Roll a planet down a ramp and under a roof, knock one off a shelf onto its twin, crack the ice at just the right spot, sort planets into the right bins... Every puzzle has a solution. Stuck? Get a hint.
+Most levels are hand-crafted puzzles: you can see every planet you'll get, in order, and mindless tapping won't get you through. Roll a planet down a ramp and under a roof, knock one off a shelf onto its twin, crack the ice at just the right spot, sort planets into the right bins... Every puzzle has a solution. Stuck? Get a hint.
 
 ★ 500 ADVENTURE LEVELS
 Journey from the Asteroid Belt to the Solar Core across 25 chapters. Every chapter brings something new: low gravity, space rocks, stardust to collect, frozen planets, spinning bars, gravity wells, solar wind and more. Every level has its own goals and a limited number of drops: finish with drops to spare to earn all three stars. Beat the boss at the end of each chapter!

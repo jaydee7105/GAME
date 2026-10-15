@@ -13,10 +13,12 @@ technology (TypeScript, WebGL, HTML/CSS) and packaged for Android with Capacitor
   stardust, clouds, frozen planets, shelves, marked planets, jelly bounce, ice,
   solar wind, spinners, gravity wells, heavy gravity, low ceiling, narrow jars)
   and the last chapters remix them, with goals, limited drops, stars and bosses
-- **Puzzle levels** (half of Adventure): you see every planet you'll get, in
-  order, and each set-up is built around a trick (Over the Wall, Bank Shot,
-  Ice Key, Tunnel Run, Sorting Machine...). Every puzzle ships with a solution
-  found by a planning bot, and a video-ad hint shows it
+- **Puzzle levels** (about 85% of Adventure): you see every planet you'll get,
+  in order, and each set-up is built around a trick (Over the Wall, Bank Shot,
+  Keyhole, Missing Step, Ice Key, Small Steps, Sorting Machine...). Every
+  puzzle ships with a solution found by a planning bot, and is rejected unless
+  spamming (one spot, or random spots) fails; a video-ad hint shows the way.
+  The rest are free-play levels: tutorial, each chapter's intro and breathers
 - 11 planets, from Asteroid to Sun, modelled procedurally in Blender
   (`art/blender/`) and lit live in WebGL, so they can roll while the light
   stays put
@@ -78,6 +80,7 @@ npx tsx tools/levelgen.ts         # build src/game/levels-data.json (seeded, rep
 npx tsx tools/puzzlegen.ts        # design the puzzle levels (planner + checks, ~30 min)
 npx tsx tools/calibrate.ts 1 500  # play each regular level, set its drop budget (~10 min)
 npx tsx tools/verify-puzzles.ts   # replay every puzzle's stored solution (also run in CI)
+npx tsx tools/spamcheck.ts 1 500  # how often spamming wins each level
 npx tsx tools/storyboard.ts 150 sb.json && python art/tools/storyboard.py sb.json sb.png  # see a puzzle's solution
 npx tsx tools/sim.ts 120 140 8    # spot-check: levels 120..140, 8 attempts each
 ```
