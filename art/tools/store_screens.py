@@ -21,7 +21,7 @@ SHOTS = [
     ("L492.png", "New twists in", "every chapter"),
     ("map.png", "500 levels", "to explore"),
     ("supernova.png", "Make two Suns for a", "SUPERNOVA!"),
-    ("complete.png", "Clear goals,", "earn every star"),
+    ("pz-hint.png", "Clever puzzles,", "hints when you're stuck"),
     ("collection.png", "Discover", "every planet"),
     ("title.png", "A new Daily Challenge", "every day"),
 ]
