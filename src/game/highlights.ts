@@ -7,11 +7,11 @@ export interface Highlight { id: number; name: string; blurb: string }
 
 export const HIGHLIGHTS: Highlight[] = [
   { id: 171, name: "Puzzle: Bank Shot", blurb: "A roof hides the twin. Roll a planet down the ramp to reach it." },
-  { id: 148, name: "Puzzle: Keyhole", blurb: "Only one planet fits through the hole in the box. Park the big ones first." },
+  { id: 89, name: "Puzzle: Keyhole", blurb: "Only one planet fits through the hole in the box. Park the big ones first." },
   { id: 131, name: "Puzzle: Missing Step", blurb: "A staircase with a gap. Fill it, then set off the chain." },
-  { id: 180, name: "Puzzle: Ice Cage", blurb: "Crack the frozen lid and it drops onto the marked planet." },
+  { id: 264, name: "Puzzle: Ice Cage", blurb: "Crack the frozen lid and it drops onto the marked planet." },
   { id: 175, name: "Puzzle: Last In, First Out", blurb: "Stacked marked planets and pieces in the wrong order. Park wisely." },
-  { id: 106, name: "Puzzle: Twin Thaw", blurb: "Free two frozen twins so they meet in the funnel." },
+  { id: 132, name: "Puzzle: Twin Thaw", blurb: "Free two frozen twins so they meet in the funnel." },
   { id: 120, name: "Puzzle: Small Steps", blurb: "Roll two halves into the little room and merge them inside." },
   { id: 161, name: "Jelly Nebula", blurb: "Free play: everything bounces." },
   { id: 201, name: "Solar Wind", blurb: "Free play: the wind shoves planets from side to side." },
