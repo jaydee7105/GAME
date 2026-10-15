@@ -25,6 +25,7 @@ type Kind = "reach" | "clear" | "dust" | "chain";
 
 const DATA = new URL("../src/game/levels-data.json", import.meta.url);
 const OUT_DIR = new URL("./out/", import.meta.url);
+const DONE_DIR = new URL("./out/puzzles/", import.meta.url);
 /** Mechanics that keep a puzzle deterministic: the jar must come to rest between drops. */
 const TIER_NAMES = ["Asteroid", "Moon", "Mercury", "Mars", "Venus", "Earth", "Neptune", "Uranus", "Saturn", "Jupiter", "Sun"];
 
@@ -322,16 +323,25 @@ if (process.env.PZ_TRY) {
 } else if (process.env.PZ_WORKER) {
   const ids = process.env.PZ_IDS!.split(",").filter(Boolean).map(Number);
   const prefs: Record<string, string[]> = JSON.parse(process.env.PZ_PREFS!);
-  const out: Record<number, LevelDef | null> = {};
-  for (const id of ids) out[id] = makePuzzle(id, prefs[id], (s) => console.log(s));
-  fs.writeFileSync(process.env.PZ_OUT!, JSON.stringify(out));
+  // Each finished puzzle is saved straight away, so an interrupted run can resume.
+  for (const id of ids) {
+    const def = makePuzzle(id, prefs[id], (s) => console.log(s));
+    fs.writeFileSync(new URL(`${id}.json`, DONE_DIR), JSON.stringify(def));
+  }
 } else {
   const from = Number(process.argv[2] ?? 1);
   const to = Number(process.argv[3] ?? LEVEL_COUNT);
   const workers = Number(process.argv[4] ?? 4);
+  const fresh = process.argv.includes("--fresh");
   const ids: number[] = [];
-  for (let id = from; id <= to; id++) if (isPuzzleSlot(id)) ids.push(id);
-  fs.mkdirSync(OUT_DIR, { recursive: true });
+  fs.mkdirSync(DONE_DIR, { recursive: true });
+  for (let id = from; id <= to; id++) {
+    if (!isPuzzleSlot(id)) continue;
+    if (fresh) fs.rmSync(new URL(`${id}.json`, DONE_DIR), { force: true });
+    else if (fs.existsSync(new URL(`${id}.json`, DONE_DIR))) continue;
+    ids.push(id);
+  }
+  console.log(`${ids.length} puzzle slots to design`);
   // Plan which idea each slot tries first so ideas don't repeat close together.
   const prefs: Record<number, string[]> = {};
   const recent: string[] = [];
@@ -342,27 +352,30 @@ if (process.env.PZ_TRY) {
   }
   const t0 = Date.now();
   const shards = Array.from({ length: workers }, (_, k) => ids.filter((_, i) => i % workers === k));
-  const results = await Promise.all(shards.map((shard, k) => new Promise<Record<number, LevelDef | null>>((resolve, reject) => {
-    const file = new URL(`puzzle-shard-${k}.json`, OUT_DIR);
+  await Promise.all(shards.filter((sh) => sh.length).map((shard, k) => new Promise<void>((resolve, reject) => {
     const child = spawn(process.execPath, ["--import", "tsx", new URL(import.meta.url).pathname], {
-      env: { ...process.env, PZ_WORKER: "1", PZ_IDS: shard.join(","), PZ_OUT: file.pathname, PZ_PREFS: JSON.stringify(prefs) },
+      env: { ...process.env, PZ_WORKER: "1", PZ_IDS: shard.join(","), PZ_PREFS: JSON.stringify(prefs) },
       stdio: ["ignore", "inherit", "inherit"],
     });
-    child.on("exit", (code) => (code === 0 ? resolve(JSON.parse(fs.readFileSync(file, "utf8"))) : reject(new Error(`worker ${k} failed`))));
+    child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`worker ${k} failed`))));
   })));
+  // Merge every designed puzzle into the level data.
   const levels: LevelDef[] = JSON.parse(fs.readFileSync(DATA, "utf8"));
   const missing: number[] = [];
-  for (const r of results) {
-    for (const [id, def] of Object.entries(r)) {
-      if (def) levels[Number(id) - 1] = def;
-      else missing.push(Number(id));
-    }
+  let total = 0;
+  for (let id = 1; id <= LEVEL_COUNT; id++) {
+    if (!isPuzzleSlot(id)) continue;
+    total++;
+    const f = new URL(`${id}.json`, DONE_DIR);
+    const def = fs.existsSync(f) ? (JSON.parse(fs.readFileSync(f, "utf8")) as LevelDef | null) : null;
+    if (def) levels[id - 1] = def;
+    else missing.push(id);
   }
   // The first puzzle of the game introduces the idea.
   const first = levels.findIndex((l) => l.queue);
   if (first >= 0) levels[first].intro = "puzzle";
   fs.writeFileSync(DATA, "[\n" + levels.map((l) => JSON.stringify(l)).join(",\n") + "\n]\n");
-  console.log(`puzzles: ${ids.length - missing.length}/${ids.length} in ${Math.round((Date.now() - t0) / 1000)} s${missing.length ? `; none found for ${missing.join(",")}` : ""}`);
+  console.log(`puzzles: ${total - missing.length}/${total} in ${Math.round((Date.now() - t0) / 1000)} s${missing.length ? `; none found for ${missing.join(",")}` : ""}`);
 }
 
 export { H };
