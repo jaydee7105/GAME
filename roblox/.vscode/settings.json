@@ -1,0 +1,15 @@
+{
+  "files.associations": {
+    "*.lua": "luau"
+  },
+  "[luau]": {
+    "editor.defaultFormatter": "JohnnyMorganz.stylua",
+    "editor.formatOnSave": true
+  },
+  "luau-lsp.platform.type": "roblox",
+  "luau-lsp.sourcemap.enabled": true,
+  "luau-lsp.sourcemap.autogenerate": true,
+  "luau-lsp.sourcemap.rojoProjectFile": "default.project.json",
+  "luau-lsp.completion.imports.enabled": true,
+  "luau-lsp.plugin.enabled": true
+}

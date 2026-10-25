@@ -1,0 +1,61 @@
+{
+  "name": "Game",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      },
+      "Remotes": {
+        "$className": "Folder",
+        "Welcome": {
+          "$className": "RemoteEvent"
+        }
+      }
+    },
+
+    "ServerScriptService": {
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "src/client"
+        }
+      }
+    },
+
+    "Workspace": {
+      "Baseplate": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "Color": [0.388, 0.372, 0.384],
+          "Locked": true,
+          "Position": [0, -10, 0],
+          "Size": [512, 20, 512]
+        }
+      },
+      "SpawnLocation": {
+        "$className": "SpawnLocation",
+        "$properties": {
+          "Anchored": true,
+          "Position": [0, 1, 0],
+          "Size": [12, 1, 12]
+        }
+      }
+    },
+
+    "Lighting": {
+      "$properties": {
+        "Brightness": 2,
+        "GlobalShadows": true,
+        "Technology": "Future"
+      }
+    }
+  }
+}

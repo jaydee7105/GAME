@@ -63,6 +63,7 @@ npm run dev        # play at http://localhost:5173 (mouse: drag to aim, release 
 | `art/` | Sources that generate the assets (Blender, audio synth, store art) |
 | `store/` | Play Store icon, feature graphic, screenshots and listing text |
 | `docs/` | Publishing guide and privacy policy |
+| `roblox/` | Roblox games (Luau + Rojo), see [roblox/README.md](roblox/README.md) |
 
 ## Testing
 

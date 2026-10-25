@@ -6,7 +6,7 @@ name: Web build
 on:
   push:
     branches: [main]
-    paths-ignore: ["**.md", "store/**", "docs/**", "art/**"]
+    paths-ignore: ["**.md", "store/**", "docs/**", "art/**", "roblox/**", ".github/workflows/roblox.yml"]
   workflow_dispatch:
 
 permissions:

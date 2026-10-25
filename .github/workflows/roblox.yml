@@ -1,0 +1,40 @@
+name: Roblox
+
+# Lints, format-checks and builds the Rojo project in roblox/.
+# The built place (game.rbxl) is attached to each run as an artifact: download
+# it and open it in Roblox Studio, or publish it from there.
+
+on:
+  push:
+    branches: ["**"]
+    paths: ["roblox/**", ".github/workflows/roblox.yml"]
+  pull_request:
+    paths: ["roblox/**", ".github/workflows/roblox.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: roblox
+    steps:
+      - uses: actions/checkout@v5
+      - uses: CompeyDev/setup-rokit@v0.2.1
+        with:
+          path: roblox
+          cache: true
+      - name: Format (StyLua)
+        run: stylua --check src
+      - name: Lint (Selene)
+        run: selene src
+      - name: Build place (Rojo)
+        run: rojo build default.project.json --output game.rbxl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: game-rbxl
+          path: roblox/game.rbxl

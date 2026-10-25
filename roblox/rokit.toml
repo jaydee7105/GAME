@@ -1,0 +1,9 @@
+# Toolchain pinned for this project. Install everything with:
+#   rokit install
+# (get Rokit from https://github.com/rojo-rbx/rokit)
+
+[tools]
+rojo = "rojo-rbx/rojo@7.7.1"
+selene = "Kampfkarren/selene@0.31.0"
+stylua = "JohnnyMorganz/StyLua@2.6.0"
+luau-lsp = "JohnnyMorganz/luau-lsp@1.70.1"
