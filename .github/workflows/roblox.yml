@@ -34,7 +34,7 @@ jobs:
         run: selene src
       - name: Build place (Rojo)
         run: rojo build default.project.json --output game.rbxl
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: game-rbxl
           path: roblox/game.rbxl
